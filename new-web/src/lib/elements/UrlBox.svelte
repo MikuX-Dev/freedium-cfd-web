@@ -1,45 +1,100 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	let url = '';
+  import { goto } from '$app/navigation';
+  let url = $state('');
 
-	const handleSubmit = async (event: Event) => {
-		event.preventDefault();
-		await goto(`/${url}`);
-	};
+  async function handleSubmit(event: Event) {
+    event.preventDefault();
+    if (url.trim()) await goto(`/${url.trim()}`);
+  }
 </script>
 
-<div class="w-full p-8 mt-8 bg-white rounded-md shadow-md md:max-w-6xl dark:bg-zinc-800">
-	<form
-		on:submit={handleSubmit}
-		class="flex items-center px-4 py-2 border rounded-md border-zinc-300"
-	>
-		<svg
-			class="w-5 h-5 mr-2 text-zinc-500 dark:text-zinc-100"
-			fill="none"
-			stroke="currentColor"
-			viewBox="0 0 24 24"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-			></path>
-		</svg>
-		<!-- svelte-ignore a11y-autofocus -->
-		<input
-			type="text"
-			placeholder="Enterx post link"
-			class="w-full bg-transparent border-zinc-300 focus:outline-none text-primary"
-			autofocus
-			bind:value={url}
-		/>
-		<button
-			type="submit"
-			class="px-4 py-2 ml-2 text-white rounded-md bg-primary hover:bg-primary/90 focus:outline-none"
-		>
-			Unlock
-		</button>
-	</form>
-</div>
+<form class="unlock" onsubmit={handleSubmit}>
+  <div class="pre">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+    </svg>
+    https://
+  </div>
+  <!-- svelte-ignore a11y_autofocus -->
+  <input
+    type="text"
+    placeholder="paste an article link, or drop a Substack / Medium / NYT URL…"
+    bind:value={url}
+    autofocus
+    aria-label="Article URL"
+  />
+  <button type="submit">
+    Unlock
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 12h14M13 5l7 7-7 7"/>
+    </svg>
+  </button>
+</form>
+
+<style>
+  .unlock {
+    max-width: 760px;
+    margin: 0 auto;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 6px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: stretch;
+    gap: 0;
+    transition: border-color 0.15s;
+  }
+  .unlock:focus-within { border-color: var(--accent-deep); }
+
+  .pre {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-3);
+    border-right: 1px dashed var(--line);
+  }
+  .pre svg { width: 14px; height: 14px; color: var(--accent); }
+
+  input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14.5px;
+    padding: 14px 16px;
+    width: 100%;
+  }
+  input::placeholder { color: var(--ink-4); }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--accent);
+    color: oklch(0.18 0.02 145);
+    border: none;
+    border-radius: 8px;
+    padding: 0 20px;
+    font-weight: 600;
+    font-size: 13px;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: filter 0.15s;
+    white-space: nowrap;
+  }
+  button:hover { filter: brightness(1.08); }
+  button svg { width: 14px; height: 14px; }
+
+  @media (max-width: 540px) {
+    .unlock { grid-template-columns: 1fr auto; }
+    .pre { display: none; }
+  }
+</style>

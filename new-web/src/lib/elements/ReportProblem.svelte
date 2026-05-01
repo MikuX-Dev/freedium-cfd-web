@@ -65,7 +65,7 @@
 				</span>
 			{/if}
 		</Dialog.Trigger>
-		<Dialog.Content class="w-full max-w-[650px] bg-white dark:bg-zinc-900 flex flex-col">
+		<Dialog.Content class="w-full max-w-[650px] flex flex-col">
 			<form onsubmit={handleSubmit}>
 				<Dialog.Header>
 					<Dialog.Title class="text-lg font-semibold tracking-tight">Report a Problem</Dialog.Title>

@@ -28,7 +28,7 @@
 			</DropdownMenu.Item>
 		</Dialog.Trigger>
 		<Dialog.Content
-			class="w-full max-w-[94%] sm:max-w-[490px] md:w-full bg-white dark:bg-zinc-900 flex flex-col"
+			class="w-full max-w-[94%] sm:max-w-[490px] md:w-full flex flex-col"
 		>
 			<Dialog.Header>
 				<Dialog.Title class="text-lg font-semibold tracking-tight"
@@ -106,7 +106,7 @@
 				<span class="ext-label">Bookmark</span>
 			</DropdownMenu.Item>
 		</Drawer.Trigger>
-		<Drawer.Content class="bg-white dark:bg-zinc-900">
+		<Drawer.Content>
 			<Drawer.Header>
 				<Drawer.Title class="text-lg font-semibold tracking-tight">
 					Add Bookmark for Medium Bypass

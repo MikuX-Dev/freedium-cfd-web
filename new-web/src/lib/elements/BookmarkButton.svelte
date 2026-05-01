@@ -22,9 +22,9 @@
 {#if $isDesktop}
 	<Dialog.Root bind:open>
 		<Dialog.Trigger class="w-full">
-			<DropdownMenu.Item onclick={(e: MouseEvent) => e.preventDefault()}>
-				<MdiBookmark class="size-4 mr-2" />
-				<span>Bookmark</span>
+			<DropdownMenu.Item class="ext-item" onclick={(e: MouseEvent) => e.preventDefault()}>
+				<MdiBookmark class="size-4 shrink-0" />
+				<span class="ext-label">Bookmark</span>
 			</DropdownMenu.Item>
 		</Dialog.Trigger>
 		<Dialog.Content
@@ -101,9 +101,9 @@
 {:else}
 	<Drawer.Root bind:open>
 		<Drawer.Trigger class="w-full">
-			<DropdownMenu.Item onclick={(e: MouseEvent) => e.preventDefault()}>
-				<MdiBookmark class="w-4 h-4 mr-2" />
-				<span>Bookmark</span>
+			<DropdownMenu.Item class="ext-item" onclick={(e: MouseEvent) => e.preventDefault()}>
+				<MdiBookmark class="size-4 shrink-0" />
+				<span class="ext-label">Bookmark</span>
 			</DropdownMenu.Item>
 		</Drawer.Trigger>
 		<Drawer.Content class="bg-white dark:bg-zinc-900">

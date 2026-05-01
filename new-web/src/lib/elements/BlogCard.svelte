@@ -107,6 +107,7 @@
     text-decoration: none;
     color: inherit;
     margin-bottom: 24px;
+    break-inside: avoid;
   }
 
   .card {
@@ -117,10 +118,11 @@
     transition: border-color 0.2s, transform 0.2s;
     position: relative;
   }
-  /* quote and stat cards also need margin */
+  /* quote and stat cards (no link wrapper) need their own break/margin */
   .card.quote,
   .card.stat-card {
     margin-bottom: 24px;
+    break-inside: avoid;
   }
   .card-link:hover .card {
     border-color: var(--line-2);

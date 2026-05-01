@@ -3,7 +3,6 @@
   import HomeBanner from '$lib/elements/HomeBanner.svelte';
   import BlogCard from '$lib/elements/BlogCard.svelte';
   import Footer from '$lib/elements/Footer.svelte';
-  import Masonry from 'svelte-bricks';
   import type { BlogPost } from '$lib/types';
 
   let activeFilter = $state('Latest');
@@ -158,11 +157,9 @@
 </div>
 
 <div class="feed">
-  <Masonry {items} minColWidth={300} maxColWidth={480} gap={0} animate={false}>
-    {#snippet children({ item }: { item: BlogPost })}
-      <BlogCard {...item} />
-    {/snippet}
-  </Masonry>
+  {#each items as item (item.id)}
+    <BlogCard {...item} />
+  {/each}
 </div>
 
 <Footer />
@@ -227,5 +224,9 @@
     max-width: 1240px;
     margin: 0 auto;
     padding: 0 28px;
+    columns: 3;
+    column-gap: 24px;
   }
+  @media (max-width: 1000px) { .feed { columns: 2; } }
+  @media (max-width: 640px)  { .feed { columns: 1; } }
 </style>

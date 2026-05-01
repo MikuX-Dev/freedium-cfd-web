@@ -1,5 +1,5 @@
 # Git worktrees
-new-web/.worktrees/
+**/.worktrees/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

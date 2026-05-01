@@ -6,7 +6,7 @@
 	export let src = undefined;
 	/** @type {string | undefined} */
 	export let alt = undefined;
-	/** @type {string | undefined} */
+	/** @type {string | null | undefined} */
 	export let zoomSrc = undefined;
 	/** @type {string | undefined} */
 	export let caption = undefined;

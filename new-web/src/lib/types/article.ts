@@ -27,8 +27,8 @@ export interface Article {
 	subtitle?: string;
 	date: string;
 	url?: string;
-	postImage?: string;
-	postImageZoom?: string;
+	postImage?: string | null;
+	postImageZoom?: string | null;
 	postImageCaption?: string;
 	author: Author;
 	tableOfContents?: TableOfContentsItem[];
@@ -62,6 +62,5 @@ export interface ArticlePageData {
 	content: string | null;
 	markdown: string | null;
 	article: Article | null;
-	postImageZoom: string | null;
 	error: ArticleError | null;
 }

@@ -70,34 +70,26 @@
 	<main class="flex-1 w-full h-full max-w-6xl px-4 py-8 mx-auto">
 		<div class="lg:flex lg:space-x-6 lg:justify-center">
 			{#if error}
-				<div class="p-6 text-center bg-white rounded-lg shadow-lg dark:bg-zinc-900">
-					<h1
-						class="mb-4 text-2xl font-bold {error.status === 404
-							? 'text-amber-600'
-							: 'text-red-600'}"
-					>
-						{error.status === 404 ? 'Article Not Found' : 'Error Loading Article'}
+				<div class="error-card">
+					<div class="error-status">{error.status}</div>
+					<div class="error-eyebrow">— {error.code.replace(/_/g, ' ')}</div>
+					<h1 class="error-title">
+						{error.status === 404 ? 'Article not found.' : 'Something went wrong.'}
 					</h1>
-					<p class="text-gray-600 dark:text-gray-400">
-						{getErrorMessage(error)}
-					</p>
+					<p class="error-message">{getErrorMessage(error)}</p>
+
 					{#if error.details && import.meta.env.DEV}
-						<pre class="p-4 mt-4 overflow-auto text-sm bg-gray-100 dark:bg-zinc-800">
-					{error.details}
-				</pre>
+						<pre class="error-details">{error.details}</pre>
 					{/if}
-					<div class="mt-6 space-x-4">
-						<a
-							href="/"
-							class="inline-block px-4 py-2 text-white rounded-md bg-primary hover:bg-primary/90"
-						>
-							Return Home
-						</a>
+
+					<div class="error-actions">
+						<a href="/" class="error-btn primary">Return home</a>
 						<button
-							class="inline-block px-4 py-2 border rounded-md border-primary text-primary hover:bg-primary/10"
+							type="button"
+							class="error-btn ghost"
 							onclick={() => window.location.reload()}
 						>
-							Try Again
+							Try again
 						</button>
 					</div>
 				</div>
@@ -308,3 +300,117 @@
 	</main>
 	<Footer />
 </div>
+
+<style>
+	.error-card {
+		max-width: 540px;
+		margin: 80px auto;
+		padding: 56px 36px 44px;
+		background: var(--bg-2);
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		text-align: center;
+	}
+
+	.error-status {
+		font-family: var(--font-serif);
+		font-size: 96px;
+		line-height: 1;
+		letter-spacing: -0.04em;
+		color: var(--accent);
+		font-style: italic;
+		margin-bottom: 14px;
+	}
+
+	.error-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--ink-3);
+		margin-bottom: 18px;
+	}
+
+	.error-title {
+		font-family: var(--font-serif);
+		font-weight: 400;
+		font-size: 36px;
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+		margin: 0 0 14px;
+		color: var(--ink);
+		text-wrap: balance;
+	}
+
+	.error-message {
+		font-size: 14.5px;
+		color: var(--ink-2);
+		line-height: 1.55;
+		max-width: 420px;
+		margin: 0 auto 28px;
+	}
+
+	.error-details {
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		text-align: left;
+		color: var(--ink-3);
+		background: var(--bg);
+		border: 1px dashed var(--line-2);
+		border-radius: 6px;
+		padding: 12px 14px;
+		overflow: auto;
+		max-height: 220px;
+		margin: 0 0 24px;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	.error-actions {
+		display: flex;
+		justify-content: center;
+		gap: 10px;
+		flex-wrap: wrap;
+	}
+
+	.error-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 10px 20px;
+		border-radius: 8px;
+		font-family: var(--font-sans);
+		font-size: 13px;
+		text-decoration: none;
+		cursor: pointer;
+		transition: filter 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
+	}
+	.error-btn.primary {
+		background: var(--accent);
+		color: oklch(0.18 0.02 145);
+		border: 1px solid var(--accent);
+		font-weight: 600;
+	}
+	.error-btn.primary:hover { filter: brightness(1.08); }
+
+	.error-btn.ghost {
+		background: transparent;
+		color: var(--ink-2);
+		border: 1px solid var(--line-2);
+		font-weight: 500;
+	}
+	.error-btn.ghost:hover {
+		color: var(--ink);
+		border-color: var(--ink-3);
+		background: var(--bg-3);
+	}
+
+	@media (max-width: 540px) {
+		.error-card {
+			padding: 40px 24px 32px;
+			margin: 40px auto;
+		}
+		.error-status { font-size: 72px; }
+		.error-title { font-size: 28px; }
+	}
+</style>

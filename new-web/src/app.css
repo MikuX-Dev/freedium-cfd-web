@@ -3,25 +3,31 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-border: hsla(var(--border));
-  --color-input: hsla(var(--input));
-  --color-ring: hsla(var(--ring));
-  --color-background: hsla(var(--background));
-  --color-foreground: hsla(var(--foreground));
-  --color-primary: hsla(var(--primary));
-  --color-primary-foreground: hsla(var(--primary-foreground));
-  --color-secondary: hsla(var(--secondary));
-  --color-secondary-foreground: hsla(var(--secondary-foreground));
-  --color-destructive: hsla(var(--destructive));
-  --color-destructive-foreground: hsla(var(--destructive-foreground));
-  --color-muted: hsla(var(--muted));
-  --color-muted-foreground: hsla(var(--muted-foreground));
-  --color-accent: hsla(var(--accent));
-  --color-accent-foreground: hsla(var(--accent-foreground));
-  --color-popover: hsla(var(--popover));
-  --color-popover-foreground: hsla(var(--popover-foreground));
-  --color-card: hsla(var(--card));
-  --color-card-foreground: hsla(var(--card-foreground));
+  /* Font families */
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  /* Tailwind semantic tokens → oklch primitives */
+  --color-border:                  var(--line);
+  --color-input:                   var(--bg-2);
+  --color-ring:                    var(--accent-deep);
+  --color-background:              var(--bg);
+  --color-foreground:              var(--ink);
+  --color-primary:                 var(--accent);
+  --color-primary-foreground:      oklch(0.18 0.02 145);
+  --color-secondary:               var(--bg-2);
+  --color-secondary-foreground:    var(--ink-2);
+  --color-destructive:             oklch(0.55 0.20 25);
+  --color-destructive-foreground:  oklch(0.97 0.005 95);
+  --color-muted:                   var(--bg-2);
+  --color-muted-foreground:        var(--ink-3);
+  --color-accent:                  var(--bg-3);
+  --color-accent-foreground:       var(--ink);
+  --color-popover:                 var(--bg-2);
+  --color-popover-foreground:      var(--ink);
+  --color-card:                    var(--bg-2);
+  --color-card-foreground:         var(--ink);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -29,168 +35,89 @@
 }
 
 @layer base {
-	:root {
-		--background: 0, 0%, 97%;
-		--foreground: 240 10% 3.9%;
+  :root {
+    /* Light mode: warm parchment */
+    --bg:          oklch(0.97 0.008 95);
+    --bg-2:        oklch(0.93 0.008 95);
+    --bg-3:        oklch(0.89 0.009 95);
+    --line:        oklch(0.82 0.008 95);
+    --line-2:      oklch(0.74 0.010 95);
+    --ink:         oklch(0.18 0.008 95);
+    --ink-2:       oklch(0.35 0.008 95);
+    --ink-3:       oklch(0.52 0.010 95);
+    --ink-4:       oklch(0.65 0.010 95);
+    --accent:      oklch(0.55 0.10 145);
+    --accent-deep: oklch(0.40 0.08 145);
+    --radius: 0.5rem;
+  }
 
-		--muted: 240 4.8% 95.9%;
-		--muted-foreground: 240 3.8% 46.1%;
+  .dark {
+    /* Dark mode: warm off-black editorial */
+    --bg:          oklch(0.18 0.008 95);
+    --bg-2:        oklch(0.215 0.009 95);
+    --bg-3:        oklch(0.255 0.010 95);
+    --line:        oklch(0.30 0.008 95);
+    --line-2:      oklch(0.36 0.010 95);
+    --ink:         oklch(0.96 0.005 95);
+    --ink-2:       oklch(0.78 0.008 95);
+    --ink-3:       oklch(0.58 0.010 95);
+    --ink-4:       oklch(0.45 0.010 95);
+    --accent:      oklch(0.82 0.10 145);
+    --accent-deep: oklch(0.55 0.08 145);
+  }
 
-		--popover: 0 0% 100%;
-		--popover-foreground: 240 10% 3.9%;
+  body, html { scroll-behavior: smooth; }
 
-		--card: 0 0% 100%;
-		--card-foreground: 240 10% 3.9%;
-
-		--border: 240 5.9% 90%;
-		--input: 240 5.9% 90%;
-
-		--primary: 142, 71%, 45%;
-		--primary-foreground: 0 0% 98%;
-
-		--secondary: 240 4.8% 95.9%;
-		--secondary-foreground: 240 5.9% 10%;
-
-		--accent: 240 4.8% 95.9%;
-		--accent-foreground: 240 5.9% 10%;
-
-		--destructive: 0 72.2% 50.6%;
-		--destructive-foreground: 0 0% 98%;
-
-		--ring: 240 10% 3.9%;
-
-		--radius: 0.5rem;
-	}
-
-	.dark {
-		--background: 240 10% 12%;
-		--foreground: 0 0% 98%;
-
-		--muted: 240 3.7% 15.9%;
-		--muted-foreground: 240 5% 64.9%;
-
-		--popover: 240 10% 3.9%;
-		--popover-foreground: 0 0% 98%;
-
-		--card: 240 10% 3.9%;
-		--card-foreground: 0 0% 98%;
-
-		--border: 240 3.7% 15.9%;
-		--input: 240 3.7% 15.9%;
-
-		--primary: 142, 71%, 45%;
-		--primary-foreground: 0 0% 98%;
-
-		--secondary: 240 3.7% 15.9%;
-		--secondary-foreground: 0 0% 98%;
-
-		--accent: 240 3.7% 15.9%;
-		--accent-foreground: 0 0% 98%;
-
-		--destructive: 0 62.8% 30.6%;
-		--destructive-foreground: 0 0% 98%;
-
-		--ring: 240 4.9% 83.9%;
-	}
-	body,
-	html {
-		scroll-behavior: smooth;
-	}
-
-	/* Smooth theme transitions */
-	* {
-		transition: background-color 500ms ease, border-color 500ms ease, box-shadow 500ms ease, color 500ms ease;
-	}
-
-	/* Higher specificity for theme-aware elements */
-	html, body, [class*="bg-"], [class*="text-"], [class*="border-"] {
-		transition: background-color 500ms ease, border-color 500ms ease, box-shadow 500ms ease, color 500ms ease;
-	}
-
-	/* Respect user's motion preferences */
-	@media (prefers-reduced-motion: reduce) {
-		* {
-			transition: none !important;
-		}
-	}
+  /* Smooth theme transitions */
+  * {
+    transition: background-color 500ms ease, border-color 500ms ease,
+                box-shadow 500ms ease, color 500ms ease;
+  }
+  html, body, [class*="bg-"], [class*="text-"], [class*="border-"] {
+    transition: background-color 500ms ease, border-color 500ms ease,
+                box-shadow 500ms ease, color 500ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
 }
 
 @layer base {
-	* {
-		@apply border-border;
-	}
-	body {
-		@apply bg-background text-foreground;
-	}
-	::selection {
-		@apply bg-primary text-primary-foreground;
-	}
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground font-sans; }
+  ::selection { @apply bg-primary text-primary-foreground; }
 }
 
 .medium-zoom-overlay,
 .medium-zoom-image--opened {
-	z-index: 999;
+  z-index: 999;
 }
 
 .medium-zoom-overlay {
-	@apply bg-white! dark:bg-zinc-900!;
+  background: var(--bg) !important;
 }
 
 @layer base {
-	/* Shiki */
-	/* --shiki-light: white; */
-	/* --shiki-dark: black; */
-	pre.shiki {
-		counter-reset: line-number;
-	}
+  /* Shiki syntax highlighting */
+  pre.shiki { counter-reset: line-number; }
+  pre.shiki code { display: grid; }
+  pre.shiki,
+  pre.shiki span { background-color: transparent; }
 
-	pre.shiki code {
-		display: grid;
-	}
+  pre.shiki .line { counter-increment: line-number; }
+  pre.shiki .line::before {
+    content: counter(line-number);
+    color: var(--ink-4);
+    display: inline-block;
+    text-align: right;
+    margin-right: 1em;
+    width: 2ch;
+  }
 
-	pre.shiki,
-	pre.shiki span {
-		/* color: var(--shiki-light) !important; */
-		background-color: transparent;
-	}
+  pre.shiki .diff.add  { background-color: oklch(0.72 0.18 145 / 0.25); }
+  pre.shiki .diff.remove { background-color: oklch(0.55 0.20 25 / 0.35); }
+  html.dark pre.shiki .diff.add    { background-color: oklch(0.45 0.12 145 / 0.35); }
+  html.dark pre.shiki .diff.remove { background-color: oklch(0.35 0.15 25 / 0.45); }
 
-	html.dark pre.shiki,
-	html.dark pre.shiki span {
-		/* color: var(--shiki-dark) !important; */
-	}
-
-	pre.shiki .line {
-		counter-increment: line-number;
-	}
-
-	pre.shiki .line::before {
-		content: counter(line-number);
-		color: hsl(240 5.3% 26.1%);
-		display: inline-block;
-		text-align: right;
-		margin-right: 1em;
-		width: 2ch;
-	}
-
-	html.dark pre.shiki .line::before {
-		color: hsl(240 5% 64.9%);
-	}
-
-	pre.shiki .diff.add {
-		background-color: hsla(141.7 76.6% 73.1% / 0.5);
-	}
-	pre.shiki .diff.remove {
-		background-color: hsla(0 93.5% 81.8% / 0.7);
-	}
-
-	html.dark pre.shiki .diff.add {
-		background-color: hsla(143.8 61.2% 20.2% / 0.7);
-	}
-	html.dark pre.shiki .diff.remove {
-		background-color: hsla(0 62.8% 30.6% / 0.7);
-	}
-
-	pre.shiki code {
-		@apply select-text cursor-text focus:outline-none;
-	}
+  pre.shiki code { @apply select-text cursor-text focus:outline-none; }
 }

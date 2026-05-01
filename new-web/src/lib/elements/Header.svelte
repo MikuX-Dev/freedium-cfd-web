@@ -64,6 +64,12 @@
 
       <ExtensionsButton />
 
+      <ReportProblem compact={true} />
+
+      <div class="w-px h-5 mx-1" style="background: var(--line)"></div>
+
+      <ThemeToggle />
+
       <div class="w-px h-5 mx-1" style="background: var(--line)"></div>
 
       <div class="flex items-center gap-0.5">
@@ -71,11 +77,6 @@
         <PayButtons name="Liberapay" url="https://liberapay.com/ZhymabekRoman/" icon={SimpleIconsLiberapay} showLabel={false} />
         <PayButtons name="Discord" url="https://discord.gg/dAxCuG9nYM" icon={SimpleIconsDiscord} showLabel={false} />
       </div>
-
-      <div class="w-px h-5 mx-1" style="background: var(--line)"></div>
-
-      <ThemeToggle />
-      <ReportProblem compact={true} />
 
       <!--
       <Button size="sm" class="ml-2 gap-1.5">
@@ -90,8 +91,8 @@
       <Button variant="ghost" size="icon" onclick={toggleSearch} title="Search">
         <Search class="size-5" />
       </Button>
-      <ThemeToggle />
       <ReportProblem compact={true} />
+      <ThemeToggle />
       <Button
         variant="ghost"
         size="icon"

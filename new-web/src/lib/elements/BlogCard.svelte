@@ -20,27 +20,26 @@
     statDesc = '',
   }: Props = $props();
 
-  const isFeatured = cardType === 'featured';
-
   const palettes = ['ph-warm', 'ph-cool', 'ph-green', 'ph-rose', 'ph-violet', 'ph-sand'];
-  const phClass = palettes[id % palettes.length];
-
   const phTags = [
     'editorial photo · 21:10', 'forest path', 'cliff coastline',
     'desk · still life', 'mushroom · macro', 'solar field · dusk', 'snow peaks'
   ];
-  const phTag = phTags[id % phTags.length];
+  const avClasses = ['av-1', 'av-2', 'av-3', 'av-4', 'av-5', 'av-6'];
 
-  const thumbClass = size === 'tall' ? 'thumb tall'
-    : (size === 'wide' || isFeatured) ? 'thumb wide'
-    : 'thumb';
+  const isFeatured = $derived(cardType === 'featured');
+  const phClass = $derived(palettes[id % palettes.length]);
+  const phTag = $derived(phTags[id % phTags.length]);
+  const thumbClass = $derived(
+    size === 'tall' ? 'thumb tall'
+      : (size === 'wide' || isFeatured) ? 'thumb wide'
+      : 'thumb'
+  );
+  const avClass = $derived(avClasses[id % avClasses.length]);
 
   function initials(name: string): string {
     return name.split(' ').map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
   }
-
-  const avClasses = ['av-1', 'av-2', 'av-3', 'av-4', 'av-5', 'av-6'];
-  const avClass = avClasses[id % avClasses.length];
 
   function formatDate(dateStr: string): string {
     try {

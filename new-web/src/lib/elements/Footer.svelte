@@ -14,7 +14,7 @@
     <a href="/about">About</a>
     <a href="/privacy">Privacy</a>
     <a href="/terms">Terms</a>
-    <a href="#">RSS</a>
+    <a href="/rss">RSS</a>
     <a href="https://github.com/Freedium-cfd" target="_blank" rel="noopener noreferrer">GitHub</a>
     <a href="https://codeberg.org/Freedium-cfd" target="_blank" rel="noopener noreferrer">Codeberg</a>
   </nav>

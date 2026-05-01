@@ -74,8 +74,11 @@
     max-width: 760px;
     margin: 14px auto 0;
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    column-gap: 24px;
+    row-gap: 8px;
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--ink-4);
@@ -98,11 +101,11 @@
     background: var(--bg-2);
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 820px) {
     .unlock-meta {
       flex-direction: column;
-      gap: 8px;
       align-items: flex-start;
+      gap: 8px;
     }
   }
 </style>

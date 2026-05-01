@@ -10,7 +10,7 @@
 	import HeroiconsExclamationTriangleSolid from '~icons/heroicons/exclamation-triangle-solid';
 	import type { ReportProblemProps } from '$lib/types';
 
-	let { variant = 'default', showBadge = false, compact = false }: ReportProblemProps = $props();
+	let { showBadge = false, compact = false }: ReportProblemProps = $props();
 
 	let open = $state(false);
 	const isDesktop = mediaQuery('(min-width: 768px)');
@@ -38,26 +38,21 @@
 		open = false;
 	};
 
-	const getVariantStyles = (v: string) => {
-		const styles: Record<string, string> = {
-			default: 'bg-primary hover:bg-primary/90',
-			warning: 'bg-purple-500 hover:bg-purple-600 text-white',
-			danger: 'bg-red-500 hover:bg-red-600 text-white'
-		};
-		return styles[v] || styles.default;
-	};
+	const triggerClass = (size: 'icon' | 'default') =>
+		`${buttonVariants({ variant: 'ghost', size })} text-zinc-600 dark:text-zinc-300 hover:text-primary dark:hover:text-primary transition-colors relative ${size === 'icon' ? 'size-9 p-0' : 'h-auto px-3 py-2'}`;
 </script>
 
 {#if $isDesktop}
 	<Dialog.Root bind:open>
 		<Dialog.Trigger
-			class={`${buttonVariants({ variant: 'default', size: compact ? 'icon' : 'default' })} ${getVariantStyles(variant)} relative`}
+			class={triggerClass(compact ? 'icon' : 'default')}
+			title="Report a problem"
 		>
 			{#if compact}
-				<HeroiconsExclamationTriangleSolid class="size-5" />
+				<HeroiconsExclamationTriangleSolid class="size-5 shrink-0" />
 			{:else}
-				<div class="flex items-center space-x-2">
-					<HeroiconsExclamationTriangleSolid class="size-5" />
+				<div class="flex items-center gap-2">
+					<HeroiconsExclamationTriangleSolid class="size-5 shrink-0" />
 					<span class="hidden text-sm font-medium lg:block">Report a problem</span>
 				</div>
 			{/if}
@@ -121,12 +116,15 @@
 	</Dialog.Root>
 {:else}
 	<Drawer.Root bind:open>
-		<Drawer.Trigger class={buttonVariants({ variant: 'default', size: compact ? 'icon' : 'default' })}>
+		<Drawer.Trigger
+			class={triggerClass(compact ? 'icon' : 'default')}
+			title="Report a problem"
+		>
 			{#if compact}
-				<HeroiconsExclamationTriangleSolid class="size-5 text-white" />
+				<HeroiconsExclamationTriangleSolid class="size-5 shrink-0" />
 			{:else}
-				<div class="flex items-center space-x-2 text-white">
-					<HeroiconsExclamationTriangleSolid class="size-5" />
+				<div class="flex items-center gap-2">
+					<HeroiconsExclamationTriangleSolid class="size-5 shrink-0" />
 					<span class="hidden text-sm font-medium lg:block">Report a problem</span>
 				</div>
 			{/if}

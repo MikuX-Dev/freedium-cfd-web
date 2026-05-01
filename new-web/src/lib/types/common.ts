@@ -10,11 +10,6 @@ import type { Component } from 'svelte';
 export type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 
 /**
- * Report problem variant types
- */
-export type ReportVariant = 'default' | 'warning' | 'danger';
-
-/**
  * Props for external link buttons (Ko-fi, Liberapay, Discord, etc.)
  */
 export interface PayButtonProps {
@@ -28,7 +23,6 @@ export interface PayButtonProps {
  * Props for the report problem component
  */
 export interface ReportProblemProps {
-	variant?: ReportVariant;
 	showBadge?: boolean;
 	compact?: boolean;
 }

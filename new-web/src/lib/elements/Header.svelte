@@ -77,10 +77,12 @@
       <ThemeToggle />
       <ReportProblem compact={true} />
 
+      <!--
       <Button size="sm" class="ml-2 gap-1.5">
         <Plus class="size-4" />
         <span>Submit link</span>
       </Button>
+      -->
     </div>
 
     <!-- Mobile Navigation -->
@@ -111,10 +113,12 @@
   {#if isNavOpen}
     <div id="mobile-menu" class="mobile-menu md:hidden">
       <div class="flex flex-col gap-2 p-4">
+        <!--
         <Button class="w-full gap-2">
           <Plus class="size-4" />
           <span>Submit link</span>
         </Button>
+        -->
 
         <div class="mobile-section">
           <p class="mobile-section-label">Support Freedium</p>

@@ -43,7 +43,7 @@
 	function downloadMarkdown() {
 		if (!data.slug) return;
 		const link = document.createElement('a');
-		link.href = articleDownloadUrl(data.slug, 'raw');
+		link.href = articleDownloadUrl(data.slug);
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);

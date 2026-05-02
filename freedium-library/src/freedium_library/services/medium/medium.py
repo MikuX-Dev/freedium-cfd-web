@@ -91,6 +91,18 @@ class MediumService(BaseService):
         Returns:
             Markdown content with YAML frontmatter containing post metadata.
         """
+        content, _ = await self.arender_with_frontmatter_and_metadata(path)
+        return content
+
+    @beartype
+    async def arender_with_frontmatter_and_metadata(
+        self, path: str
+    ) -> tuple[str, PostMetadata]:
+        """
+        Like arender_with_frontmatter but also surfaces the extracted PostMetadata
+        so callers (e.g. the recent-posts feed) can use the structured fields
+        without re-parsing YAML or re-fetching the post.
+        """
         post_id = await self.path_validator.aextract_post_id(path)
         if not post_id:
             raise InvalidMediumServicePathError(f"Could not extract post ID from: {path}")
@@ -102,7 +114,8 @@ class MediumService(BaseService):
             raise InvalidMediumServicePathError(f"Failed to fetch post: {post_id}")
 
         renderer = MediumMarkdownRenderer(post_data, self.api_service)
-        return await renderer.render_with_frontmatter()
+        content = await renderer.render_with_frontmatter()
+        return content, renderer.metadata
 
     async def _render_to_markdown(self, post_data: GraphQLPost) -> str:
         """Convert post data to Markdown format."""

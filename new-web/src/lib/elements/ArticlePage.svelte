@@ -71,7 +71,7 @@
 
 <Header />
 <div class="flex flex-col min-h-screen">
-	<main class="flex-1 w-full h-full max-w-3xl px-4 py-8 mx-auto">
+	<main class="flex-1 w-full h-full max-w-5xl px-4 py-8 mx-auto">
 		<div>
 			{#if error}
 				<div class="error-card">

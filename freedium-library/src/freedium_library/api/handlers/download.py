@@ -1,6 +1,7 @@
 """End-to-end article download: render Medium → resolve gists → file."""
 
 import re
+from collections.abc import Iterable
 
 from beartype import beartype
 from dependency_injector.wiring import Provide, inject
@@ -14,6 +15,7 @@ from freedium_library.services.medium.gist_resolver import (
     ResolverMode,
     resolve_gists_in_markdown,
 )
+from freedium_library.services.medium.renderer import PostMetadata
 
 # Strategy used for gist resolution on the download path. Switch to "rich"
 # to embed filename headers, language tags, and multi-file gists at the
@@ -32,17 +34,42 @@ def _slugify(title: str | None, fallback: str = "article") -> str:
     return slug or fallback
 
 
+def _yaml_quote(value: str) -> str:
+    """Double-quoted YAML scalar safe for arbitrary text."""
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+@beartype
+def _build_frontmatter(metadata: PostMetadata) -> str:
+    """YAML frontmatter with title, subtitle, tags. Skips empty fields so
+    consumers don't see `subtitle: ""` for articles that don't have one."""
+    lines: list[str] = ["---"]
+    if metadata.title:
+        lines.append(f"title: {_yaml_quote(metadata.title)}")
+    if metadata.subtitle:
+        lines.append(f"subtitle: {_yaml_quote(metadata.subtitle)}")
+    tags: Iterable[str] = (t for t in metadata.tags if t)
+    rendered_tags = [_yaml_quote(t) for t in tags]
+    if rendered_tags:
+        lines.append(f"tags: [{', '.join(rendered_tags)}]")
+    lines.append("---")
+    lines.append("")
+    return "\n".join(lines)
+
+
 @beartype
 @inject
 async def _build_download(
     url: str,
     medium_service: MediumService = Provide[MediumContainer.service],
 ) -> tuple[str, str]:
-    """Render the article, resolve gists, return (markdown, filename)."""
+    """Render the article, resolve gists, prepend frontmatter, return
+    (markdown, filename)."""
     markdown, metadata = await medium_service.arender_with_metadata(url)
     resolved = await resolve_gists_in_markdown(markdown, mode=_GIST_MODE)
+    body = _build_frontmatter(metadata) + "\n" + resolved
     filename = f"{_slugify(metadata.title)}.md"
-    return resolved, filename
+    return body, filename
 
 
 def register_download_router(router: APIRouter) -> None:

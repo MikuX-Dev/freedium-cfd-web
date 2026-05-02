@@ -1,4 +1,3 @@
-from beartype import beartype
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -19,16 +18,12 @@ class ResolveGistsResponse(BaseModel):
     )
 
 
-@beartype
-def _resolve(markdown: str) -> str:
-    return resolve_gists_in_markdown(markdown)
-
-
 def register_markdown_router(router: APIRouter) -> None:
     markdown_router = APIRouter(prefix="/markdown")
 
     async def resolve_gists(body: ResolveGistsRequest) -> ResolveGistsResponse:
-        return ResolveGistsResponse(markdown=_resolve(body.markdown))
+        resolved = await resolve_gists_in_markdown(body.markdown)
+        return ResolveGistsResponse(markdown=resolved)
 
     markdown_router.add_api_route(
         "/resolve-gists",

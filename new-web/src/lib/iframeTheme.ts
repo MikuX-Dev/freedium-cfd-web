@@ -42,6 +42,13 @@ a, .gist a { color:#58a6ff !important; }
 .gist .pl-v   { color:#ffa657 !important; }
 `.trim();
 
+// Set on the host <iframe> element once we've had a chance to inject (or
+// confirm absent) the dark-theme overrides. Paired with a CSS rule in
+// ArticlePage.css that hides un-themed iframes when dark mode is active —
+// without this, the iframe paints its own light styles before our override
+// lands and the user sees a FOUC flash on first load.
+const THEMED_ATTR = "data-iframe-themed";
+
 function applyTheme(iframe: HTMLIFrameElement, theme: "light" | "dark"): boolean {
 	let doc: Document | null;
 	try {
@@ -63,6 +70,7 @@ function applyTheme(iframe: HTMLIFrameElement, theme: "light" | "dark"): boolean
 	} else if (existing) {
 		existing.remove();
 	}
+	iframe.setAttribute(THEMED_ATTR, "");
 	return true;
 }
 
@@ -79,7 +87,13 @@ export function startIframeThemeSync(
 		// Try immediately — works if the iframe document is already parsed.
 		if (applyTheme(iframe, getTheme())) return;
 		// Otherwise wait for the iframe's load event before applying.
-		const onLoad = () => applyTheme(iframe, getTheme());
+		const onLoad = () => {
+			applyTheme(iframe, getTheme());
+			// Failsafe: even if applyTheme couldn't reach contentDocument
+			// (e.g. cross-origin in some unforeseen case), reveal the iframe
+			// rather than leaving it hidden by the CSS gate forever.
+			iframe.setAttribute(THEMED_ATTR, "");
+		};
 		iframe.addEventListener("load", onLoad);
 		listeners.set(iframe, () => iframe.removeEventListener("load", onLoad));
 	}

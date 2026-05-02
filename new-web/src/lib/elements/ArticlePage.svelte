@@ -7,12 +7,10 @@
 	import Footer from '$lib/elements/Footer.svelte';
 	import './ArticlePage.css';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import HeroiconsArrowLeft20Solid from '~icons/heroicons/arrow-left-20-solid';
+	import ArticleActions from '$lib/elements/ArticleActions.svelte';
 	import HeroiconsDocumentArrowDown20Solid from '~icons/heroicons/document-arrow-down-20-solid';
 	import HeroiconsDocumentText20Solid from '~icons/heroicons/document-text-20-solid';
 	import HeroiconsChevronDown20Solid from '~icons/heroicons/chevron-down-20-solid';
-	import HeroiconsArrowTopRightOnSquare20Solid from '~icons/heroicons/arrow-top-right-on-square-20-solid';
-	import HeroiconsShare20Solid from '~icons/heroicons/share-20-solid';
 	import { onMount } from 'svelte';
 	import { mode } from 'mode-watcher';
 	import { initializeCodeCopyButtons } from '$lib/codeCopy';
@@ -42,31 +40,6 @@
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);
-	}
-
-	let shareFeedback = $state<'idle' | 'copied'>('idle');
-
-	async function shareArticle() {
-		if (typeof window === 'undefined') return;
-		const url = window.location.href;
-		const title = data.article?.title ?? 'Freedium';
-		const sharePayload = { title, url };
-		if (navigator.share) {
-			try {
-				await navigator.share(sharePayload);
-				return;
-			} catch (err) {
-				// User cancelled — fall through to clipboard.
-				if ((err as DOMException)?.name === 'AbortError') return;
-			}
-		}
-		try {
-			await navigator.clipboard.writeText(url);
-			shareFeedback = 'copied';
-			setTimeout(() => { shareFeedback = 'idle'; }, 1500);
-		} catch {
-			// Clipboard blocked — best-effort, no further fallback.
-		}
 	}
 
 	onMount(() => {
@@ -148,40 +121,7 @@
 				</article>
 			{:else if article}
 				<article class="overflow-hidden bg-white rounded-lg shadow-lg dark:bg-zinc-900">
-					<nav class="flex items-center gap-2 p-4">
-						<button
-							type="button"
-							aria-label="Go back"
-							title="Go back"
-							class="flex items-center justify-center transition bg-white rounded-full shadow-md text-primary hover:text-primary/90 group size-8 shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:bg-zinc-800 dark:ring-0 dark:ring-white/10 dark:hover:border-zinc-700 dark:hover:ring-white/20"
-							onclick={() => window.history.back()}
-						>
-							<HeroiconsArrowLeft20Solid class="size-5" />
-						</button>
-						<div class="flex items-center gap-2 ml-auto">
-							<button
-								type="button"
-								aria-label={shareFeedback === 'copied' ? 'Link copied' : 'Share article'}
-								title={shareFeedback === 'copied' ? 'Link copied' : 'Share article'}
-								class="flex items-center justify-center transition bg-white rounded-full shadow-md text-primary hover:text-primary/90 size-8 shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:bg-zinc-800 dark:ring-0 dark:ring-white/10 dark:hover:border-zinc-700 dark:hover:ring-white/20"
-								onclick={shareArticle}
-							>
-								<HeroiconsShare20Solid class="size-5" />
-							</button>
-							{#if article.url}
-								<a
-									href={article.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									aria-label="Open original article"
-									title="Open original article"
-									class="flex items-center justify-center transition bg-white rounded-full shadow-md text-primary hover:text-primary/90 size-8 shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:bg-zinc-800 dark:ring-0 dark:ring-white/10 dark:hover:border-zinc-700 dark:hover:ring-white/20"
-								>
-									<HeroiconsArrowTopRightOnSquare20Solid class="size-5" />
-								</a>
-							{/if}
-						</div>
-					</nav>
+					<ArticleActions originalUrl={article.url} title={article.title} />
 					{#if article.postImage}
 						<ImageZoom
 							src={article.postImage}
@@ -264,6 +204,9 @@
 								<p>Error loading content</p>
 							{/if}
 						</div>
+					</div>
+					<div class="border-t border-gray-200 dark:border-zinc-700">
+						<ArticleActions originalUrl={article.url} title={article.title} />
 					</div>
 				</article>
 			{/if}

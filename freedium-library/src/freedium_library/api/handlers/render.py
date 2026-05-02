@@ -2,11 +2,13 @@ from beartype import beartype
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
+from loguru import logger
 from pydantic import BaseModel
 
 from freedium_library.services.medium import MediumService
 from freedium_library.services.medium.container import MediumContainer
 from freedium_library.services.medium.exceptions import InvalidMediumServicePathError
+from freedium_library.services.recent_posts import RecentPostsService
 from freedium_library.services.resolver import ServiceResolver, ServiceResolutionError
 
 
@@ -24,11 +26,35 @@ class RenderResponse(BaseModel):
     service: str
 
 
+async def _record_recent(
+    request: Request | None, metadata: object
+) -> None:
+    """Push a rendered post's metadata into the recent-posts feed.
+
+    Best-effort: any failure (no service wired up, lock contention, etc.)
+    must never break the render response — recent posts is decorative.
+    The service is read off app.state because it's instantiated by the
+    lifespan singleton, not the per-request DI container.
+    """
+    if request is None:
+        return
+    service: RecentPostsService | None = getattr(
+        request.app.state, "recent_posts_service", None
+    )
+    if service is None:
+        return
+    try:
+        await service.record(metadata)  # type: ignore[arg-type]
+    except Exception as exc:  # noqa: BLE001 — defensive: never break render
+        logger.warning(f"Failed to record recent post: {exc}")
+
+
 @beartype
 @inject
 async def render_medium_post(
     post_id: str,
     include_frontmatter: bool = False,
+    request: Request | None = None,
     medium_service: MediumService = Provide[MediumContainer.service],
 ) -> PlainTextResponse:
     """
@@ -37,17 +63,23 @@ async def render_medium_post(
     Args:
         post_id: The Medium post ID or URL to render
         include_frontmatter: Whether to include YAML frontmatter
+        request: The HTTP request (used to access app state for recent-posts feed)
         medium_service: The Medium service instance (injected)
 
     Returns:
         Rendered Markdown content
     """
     try:
+        # Use the *_and_metadata variants so we capture PostMetadata in the same
+        # GraphQL fetch — no extra round-trip just for the recent-posts feed.
         if include_frontmatter:
-            content = await medium_service.arender_with_frontmatter(post_id)
+            content, metadata = (
+                await medium_service.arender_with_frontmatter_and_metadata(post_id)
+            )
         else:
-            content = await medium_service.arender(post_id)
+            content, metadata = await medium_service.arender_with_metadata(post_id)
 
+        await _record_recent(request, metadata)
         return PlainTextResponse(content=content, media_type="text/markdown")
 
     except InvalidMediumServicePathError as e:
@@ -80,11 +112,22 @@ async def render_universal(
         # Resolve the content to appropriate service
         service_name, service = await resolver.resolve(request.content)
 
-        # Render using the resolved service
-        if request.frontmatter:
-            markdown = await service.arender_with_frontmatter(request.content)
+        # Render using the resolved service. For Medium, use the *_and_metadata
+        # variants so we can populate the recent-posts feed in the same GraphQL
+        # fetch — no extra round-trip just for feed data.
+        if service_name == "medium" and isinstance(service, MediumService):
+            if request.frontmatter:
+                markdown, metadata = (
+                    await service.arender_with_frontmatter_and_metadata(request.content)
+                )
+            else:
+                markdown, metadata = await service.arender_with_metadata(request.content)
+            await _record_recent(http_request, metadata)
         else:
-            markdown = await service.arender(request.content)
+            if request.frontmatter:
+                markdown = await service.arender_with_frontmatter(request.content)
+            else:
+                markdown = await service.arender(request.content)
 
         return RenderResponse(markdown=markdown, service=service_name)
 
@@ -115,10 +158,13 @@ def register_render_router(router: APIRouter) -> None:
 
     # Legacy Medium-specific endpoint (kept for backwards compatibility)
     async def _render_medium(
+        request: Request,
         post_id: str,
         frontmatter: bool = Query(False, description="Include YAML frontmatter"),
     ) -> PlainTextResponse:
-        return await render_medium_post(post_id, include_frontmatter=frontmatter)
+        return await render_medium_post(
+            post_id, include_frontmatter=frontmatter, request=request
+        )
 
     render_router.add_api_route(
         "/medium/{post_id:path}",

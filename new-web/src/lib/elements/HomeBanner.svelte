@@ -61,7 +61,7 @@
     </div>
     <h1>Reading, <em>without the wall.</em></h1>
     <p class="lede">Paste any paywalled article link below — Freedium fetches an open, ad-free version you can keep.</p>
-    <UrlBox />
+    <UrlBox showProtocol={false} />
     <div class="unlock-meta">
       <div class="stat">↳ <strong>1.2M</strong> articles unlocked this month</div>
       <div class="stat">

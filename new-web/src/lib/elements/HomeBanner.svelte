@@ -3,28 +3,183 @@
 </script>
 
 <section class="hero">
-  <div class="eyebrow">
-    <span class="pulse"></span>
-    Open access reader · est. 2023
+  <div class="hero-bg" aria-hidden="true">
+    <article class="skeleton sk-1">
+      <div class="sk-avatar"></div>
+      <div class="sk-title"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line short"></div>
+    </article>
+    <article class="skeleton sk-2">
+      <div class="sk-avatar"></div>
+      <div class="sk-title"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line short"></div>
+    </article>
+    <article class="skeleton sk-3">
+      <div class="sk-avatar"></div>
+      <div class="sk-title short"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line short"></div>
+    </article>
+    <article class="skeleton sk-4">
+      <div class="sk-avatar"></div>
+      <div class="sk-title"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+    </article>
+    <article class="skeleton sk-5">
+      <div class="sk-avatar"></div>
+      <div class="sk-title short"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line short"></div>
+    </article>
+    <article class="skeleton sk-6">
+      <div class="sk-avatar"></div>
+      <div class="sk-title"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line short"></div>
+    </article>
   </div>
-  <h1>Reading, <em>without the wall.</em></h1>
-  <p class="lede">Paste any paywalled article link below — Freedium fetches an open, ad-free version you can keep.</p>
-  <UrlBox />
-  <div class="unlock-meta">
-    <div class="stat">↳ <strong>1.2M</strong> articles unlocked this month</div>
-    <div class="stat">
-      <kbd>↵</kbd> to unlock · <kbd>⇧↵</kbd> to save without opening
+
+  <div class="hero-content">
+    <div class="eyebrow">
+      <span class="pulse"></span>
+      Open access reader · est. 2023
     </div>
-    <div class="stat"><strong>26ms</strong> avg fetch</div>
+    <h1>Reading, <em>without the wall.</em></h1>
+    <p class="lede">Paste any paywalled article link below — Freedium fetches an open, ad-free version you can keep.</p>
+    <UrlBox />
+    <div class="unlock-meta">
+      <div class="stat">↳ <strong>1.2M</strong> articles unlocked this month</div>
+      <div class="stat">
+        <kbd>↵</kbd> to unlock · <kbd>⇧↵</kbd> to save without opening
+      </div>
+      <div class="stat"><strong>26ms</strong> avg fetch</div>
+    </div>
   </div>
 </section>
 
 <style>
   .hero {
+    position: relative;
     max-width: 980px;
     margin: 0 auto;
     padding: 72px 28px 36px;
     text-align: center;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Decorative drifting article skeletons — pure background ambience. */
+  .hero-bg {
+    position: absolute;
+    inset: -40px -40vw;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    /* Soft mask so skeletons fade toward the hero center, keeping focus on text. */
+    -webkit-mask-image:
+      radial-gradient(ellipse 60% 70% at 50% 50%, transparent 0%, transparent 30%, #000 75%);
+    mask-image:
+      radial-gradient(ellipse 60% 70% at 50% 50%, transparent 0%, transparent 30%, #000 75%);
+  }
+
+  .skeleton {
+    position: absolute;
+    width: 220px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: color-mix(in oklch, var(--bg-2) 70%, transparent);
+    text-align: left;
+    opacity: 0;
+    animation: sk-fade-in 1.4s ease-out forwards, sk-drift 24s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  .sk-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--line);
+    margin-bottom: 12px;
+  }
+  .sk-title {
+    height: 10px;
+    width: 80%;
+    border-radius: 2px;
+    background: var(--line);
+    margin-bottom: 10px;
+  }
+  .sk-title.short { width: 55%; }
+  .sk-line {
+    height: 6px;
+    width: 100%;
+    border-radius: 2px;
+    background: var(--line-2);
+    margin-bottom: 6px;
+  }
+  .sk-line.short { width: 60%; }
+
+  /* Distribute skeletons around the hero edges with varied animation timing. */
+  .sk-1 { top: 4%;   left: 2%;  animation-delay: 0s, -2s;   transform: rotate(-3deg); }
+  .sk-2 { top: 10%;  right: 4%; animation-delay: 0.2s, -8s; transform: rotate(2deg); }
+  .sk-3 { top: 48%;  left: -2%; animation-delay: 0.4s, -14s; transform: rotate(1deg); }
+  .sk-4 { top: 52%;  right: 0%; animation-delay: 0.6s, -5s;  transform: rotate(-2deg); }
+  .sk-5 { bottom: 6%; left: 6%;  animation-delay: 0.8s, -11s; transform: rotate(2deg); }
+  .sk-6 { bottom: 2%; right: 8%; animation-delay: 1s, -17s;  transform: rotate(-1deg); }
+
+  /* Each skeleton uses two animations: fade-in (once) + drift (loop).
+     Keep fade-in additive so the rotate baseline survives the drift. */
+  @keyframes sk-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 0.55; }
+  }
+  @keyframes sk-drift {
+    0%, 100% { translate: 0 0; }
+    50%      { translate: 0 -14px; }
+  }
+
+  /* Subtle shimmer pulse on the title bar to suggest "loading" articles. */
+  .sk-title {
+    background: linear-gradient(
+      90deg,
+      var(--line) 0%,
+      var(--line-2) 50%,
+      var(--line) 100%
+    );
+    background-size: 200% 100%;
+    animation: sk-shimmer 6s linear infinite;
+  }
+  .sk-1 .sk-title { animation-delay: -1s; }
+  .sk-2 .sk-title { animation-delay: -3s; }
+  .sk-3 .sk-title { animation-delay: -5s; }
+  .sk-4 .sk-title { animation-delay: -2s; }
+  .sk-5 .sk-title { animation-delay: -4s; }
+  .sk-6 .sk-title { animation-delay: -6s; }
+  @keyframes sk-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Hide skeletons on narrow viewports to avoid crowding the hero text. */
+  @media (max-width: 1180px) {
+    .hero-bg { display: none; }
+  }
+
+  /* Honor reduced-motion preferences: snap to visible without animation. */
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      animation: none;
+      opacity: 0.4;
+    }
+    .sk-title { animation: none; }
   }
 
   .eyebrow {

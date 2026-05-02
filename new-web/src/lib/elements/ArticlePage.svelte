@@ -20,6 +20,7 @@
 	import { initializeLazyIframes } from '$lib/lazyIframe';
 	import { initializeImageZoom } from '$lib/imageZoom';
 	import { startIframeThemeSync } from '$lib/iframeTheme';
+	import { resolveIframesInMarkdown } from '$lib/gistResolver';
 	import type { ArticlePageData } from '$lib/types';
 
 	interface Props {
@@ -42,7 +43,8 @@
 	function downloadMarkdown() {
 		if (!markdown || !article) return;
 
-		const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+		const resolved = resolveIframesInMarkdown(markdown);
+		const blob = new Blob([resolved], { type: 'text/markdown;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;

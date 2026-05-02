@@ -42,6 +42,16 @@
       <div class="sk-line"></div>
       <div class="sk-line short"></div>
     </article>
+
+    <span class="dot dot-1"></span>
+    <span class="dot dot-2"></span>
+    <span class="dot dot-3"></span>
+    <span class="dot dot-4"></span>
+    <span class="dot dot-5"></span>
+    <span class="dot dot-6"></span>
+    <span class="dot dot-7"></span>
+    <span class="dot dot-8"></span>
+    <span class="dot dot-9"></span>
   </div>
 
   <div class="hero-content">
@@ -168,6 +178,57 @@
     100% { background-position: -200% 0; }
   }
 
+  /* Pulsing accent dots scattered across the background — echoes the
+     eyebrow pulse to suggest a live network of articles being unlocked. */
+  .dot {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    animation: dot-pulse 4s ease-out infinite;
+  }
+  .dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid var(--accent);
+    animation: dot-ring 4s ease-out infinite;
+  }
+
+  /* Distribute dots away from the dense skeleton zones, on a soft scatter. */
+  .dot-1 { top: 18%; left: 22%; animation-delay: 0s; }
+  .dot-1::after { animation-delay: 0s; }
+  .dot-2 { top: 8%;  left: 70%; animation-delay: 0.6s; }
+  .dot-2::after { animation-delay: 0.6s; }
+  .dot-3 { top: 38%; left: 12%; animation-delay: 1.2s; }
+  .dot-3::after { animation-delay: 1.2s; }
+  .dot-4 { top: 30%; right: 18%; animation-delay: 1.8s; }
+  .dot-4::after { animation-delay: 1.8s; }
+  .dot-5 { top: 62%; left: 28%; animation-delay: 2.4s; }
+  .dot-5::after { animation-delay: 2.4s; }
+  .dot-6 { top: 70%; right: 24%; animation-delay: 3s; }
+  .dot-6::after { animation-delay: 3s; }
+  .dot-7 { bottom: 14%; left: 40%; animation-delay: 0.3s; }
+  .dot-7::after { animation-delay: 0.3s; }
+  .dot-8 { top: 24%; left: 48%; animation-delay: 1.5s; }
+  .dot-8::after { animation-delay: 1.5s; }
+  .dot-9 { bottom: 22%; right: 44%; animation-delay: 2.7s; }
+  .dot-9::after { animation-delay: 2.7s; }
+
+  @keyframes dot-pulse {
+    0%   { opacity: 0; }
+    20%  { opacity: 0.7; }
+    60%  { opacity: 0.4; }
+    100% { opacity: 0; }
+  }
+  @keyframes dot-ring {
+    0%   { transform: scale(1);   opacity: 0.6; }
+    100% { transform: scale(5);   opacity: 0; }
+  }
+
   /* Hide skeletons on narrow viewports to avoid crowding the hero text. */
   @media (max-width: 1180px) {
     .hero-bg { display: none; }
@@ -180,6 +241,8 @@
       opacity: 0.4;
     }
     .sk-title { animation: none; }
+    .dot, .dot::after { animation: none; }
+    .dot { opacity: 0.4; }
   }
 
   .eyebrow {

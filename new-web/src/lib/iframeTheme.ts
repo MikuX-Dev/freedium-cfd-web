@@ -1,21 +1,71 @@
-import { fetchIframeHtml } from "@/services/iframe";
-
 /**
- * Sync iframe srcdoc with the page theme.
+ * Sync iframe contents with the page theme.
  *
- * Each iframe rendered by the backend is tagged with `data-iframe-id`
- * (the Medium media id) and `data-iframe-theme` (the theme that was
- * baked into its current srcdoc). When the page theme differs from
- * the iframe's baked theme, we refetch a themed variant of the HTML
- * via /api/iframe/{id}?theme=... and swap srcdoc in place.
+ * Each iframe rendered by the backend is tagged with `data-iframe-id` and
+ * served via `srcdoc`, which makes it same-origin to the parent page. We
+ * inject (or remove) a `<style>` element directly into `iframe.contentDocument`
+ * to override the upstream embed's colors when the page is in dark mode.
  *
- * Costs (see /tmp/iframe-theme-test-D.html for a hands-on demo):
- *   - in-iframe state resets on every swap
- *   - in-iframe scroll position resets
- *   - brief opacity flash mid-swap
+ * No network round-trip on toggle, no srcdoc swap, no in-iframe state loss,
+ * no scroll reset, no flash. Idempotent — safe to call repeatedly.
  *
- * Returns a disposer the caller can use to stop syncing.
+ * Returns a disposer that removes any pending load listeners.
  */
+
+const STYLE_ID = "freedium-theme-overrides";
+
+const IFRAME_DARK_STYLES = `
+body { background:#0c0c0c !important; color:#d4d4d4 !important; }
+a, .gist a { color:#58a6ff !important; }
+.gist,
+.gist .gist-data,
+.gist .gist-file,
+.gist .gist-meta,
+.gist .blob-wrapper,
+.gist .blob-code-inner,
+.gist .markdown-body,
+.gist .markdown-body pre,
+.gist .markdown-body code { background:#0c0c0c !important; color:#d4d4d4 !important; border-color:#2a2a2a !important; }
+.gist .blob-num { background:#161616 !important; color:#6a6a6a !important; border-color:#2a2a2a !important; }
+.gist .gist-meta,
+.gist .gist-meta strong { color:#888 !important; }
+.gist .pl-c  { color:#7a7a7a !important; }
+.gist .pl-s,
+.gist .pl-s1,
+.gist .pl-pds { color:#a5d6a7 !important; }
+.gist .pl-k,
+.gist .pl-kos { color:#ff7b72 !important; }
+.gist .pl-e,
+.gist .pl-en { color:#d2a8ff !important; }
+.gist .pl-c1,
+.gist .pl-cn { color:#79c0ff !important; }
+.gist .pl-v   { color:#ffa657 !important; }
+`.trim();
+
+function applyTheme(iframe: HTMLIFrameElement, theme: "light" | "dark"): boolean {
+	let doc: Document | null;
+	try {
+		doc = iframe.contentDocument;
+	} catch {
+		// Defensive: cross-origin would throw, but srcdoc iframes are same-origin.
+		return false;
+	}
+	if (!doc?.documentElement) return false;
+	const head = doc.head ?? doc.documentElement;
+	const existing = doc.getElementById(STYLE_ID);
+	if (theme === "dark") {
+		if (!existing) {
+			const style = doc.createElement("style");
+			style.id = STYLE_ID;
+			style.textContent = IFRAME_DARK_STYLES;
+			head.appendChild(style);
+		}
+	} else if (existing) {
+		existing.remove();
+	}
+	return true;
+}
+
 export function startIframeThemeSync(
 	getTheme: () => "light" | "dark",
 	rootSelector: string = ".prose",
@@ -23,61 +73,24 @@ export function startIframeThemeSync(
 	const root = document.querySelector(rootSelector);
 	if (!root) return () => {};
 
-	const inflight = new Map<HTMLIFrameElement, AbortController>();
+	const listeners = new Map<HTMLIFrameElement, () => void>();
 
-	function findIframes(): HTMLIFrameElement[] {
-		return Array.from(
-			root!.querySelectorAll<HTMLIFrameElement>("iframe[data-iframe-id]"),
-		);
+	function ensure(iframe: HTMLIFrameElement) {
+		// Try immediately — works if the iframe document is already parsed.
+		if (applyTheme(iframe, getTheme())) return;
+		// Otherwise wait for the iframe's load event before applying.
+		const onLoad = () => applyTheme(iframe, getTheme());
+		iframe.addEventListener("load", onLoad);
+		listeners.set(iframe, () => iframe.removeEventListener("load", onLoad));
 	}
 
-	async function swap(iframe: HTMLIFrameElement, theme: "light" | "dark") {
-		const id = iframe.dataset.iframeId;
-		if (!id) return;
-		// Already in sync — nothing to do
-		if (iframe.dataset.iframeTheme === theme) return;
-
-		// Cancel any prior in-flight swap on this iframe
-		inflight.get(iframe)?.abort();
-		const ctrl = new AbortController();
-		inflight.set(iframe, ctrl);
-
-		try {
-			iframe.style.transition ||= "opacity 180ms ease";
-			iframe.style.opacity = "0";
-
-			const html = await fetchIframeHtml(id, theme);
-			if (ctrl.signal.aborted) return;
-
-			iframe.srcdoc = html;
-			iframe.dataset.iframeTheme = theme;
-
-			// Restore opacity once the iframe document has parsed
-			const onLoad = () => {
-				iframe.style.opacity = "1";
-				iframe.removeEventListener("load", onLoad);
-			};
-			iframe.addEventListener("load", onLoad);
-		} catch (err) {
-			if (!ctrl.signal.aborted) {
-				console.warn(`Iframe theme swap failed for ${id}:`, err);
-				iframe.style.opacity = "1";
-			}
-		} finally {
-			if (inflight.get(iframe) === ctrl) inflight.delete(iframe);
-		}
-	}
-
-	function syncAll() {
-		const theme = getTheme();
-		for (const iframe of findIframes()) void swap(iframe, theme);
-	}
-
-	// Initial sync (catches dark-mode users on first load)
-	syncAll();
+	const iframes = root.querySelectorAll<HTMLIFrameElement>(
+		"iframe[data-iframe-id]",
+	);
+	for (const iframe of iframes) ensure(iframe);
 
 	return () => {
-		for (const ctrl of inflight.values()) ctrl.abort();
-		inflight.clear();
+		for (const off of listeners.values()) off();
+		listeners.clear();
 	};
 }

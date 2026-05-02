@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from loguru import logger
 
 from freedium_library.api.container import APIContainer
-from freedium_library.api.handlers import articles, iframe, render
+from freedium_library.api.handlers import articles, render
 from freedium_library.services.medium import MediumService
 from freedium_library.services.medium.container import MediumContainer
 from freedium_library.services.recent_posts.container import RecentPostsContainer
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.service_resolver = resolver
 
     # Wire dependency injection to modules
-    medium_container.wire(modules=[render, iframe])
+    medium_container.wire(modules=[render])
     recent_posts_container.wire(modules=[articles])
 
     # Warm up the recent-posts feed in the background so the home page

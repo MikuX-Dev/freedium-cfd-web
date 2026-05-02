@@ -92,12 +92,12 @@
     inset: -40px 0;
     z-index: 0;
     pointer-events: none;
-    overflow: hidden;
-    /* Soft mask so skeletons fade toward the hero center, keeping focus on text. */
+    /* No overflow:hidden — let skeletons render whole rather than clip
+       at the box edges. The mask below softens overlap with the hero text. */
     -webkit-mask-image:
-      radial-gradient(ellipse 60% 70% at 50% 50%, transparent 0%, transparent 30%, #000 75%);
+      radial-gradient(ellipse 38% 45% at 50% 50%, transparent 0%, #000 85%);
     mask-image:
-      radial-gradient(ellipse 60% 70% at 50% 50%, transparent 0%, transparent 30%, #000 75%);
+      radial-gradient(ellipse 38% 45% at 50% 50%, transparent 0%, #000 85%);
   }
 
   .skeleton {

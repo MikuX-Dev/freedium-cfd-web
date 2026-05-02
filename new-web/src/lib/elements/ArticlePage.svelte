@@ -32,6 +32,7 @@
 	let error = $derived(data.error);
 	let contentLoaded = $derived(!loading && !!content);
 	let showSkeleton = $derived(!error && !contentLoaded);
+	let toc = $derived(article?.tableOfContents ?? []);
 
 	function downloadMarkdown() {
 		if (!data.slug) return;
@@ -148,10 +149,14 @@
 
 					<section
 						class="px-6 py-5 border-b border-gray-200 dark:border-zinc-700"
-						aria-labelledby="toc-heading"
+						aria-labelledby={toc.length > 0 ? 'toc-heading' : undefined}
 					>
-						<div class="flex flex-wrap items-start justify-between gap-3 mb-3">
-							<h2 id="toc-heading" class="text-xl font-semibold text-primary">Contents</h2>
+						<div
+							class="flex flex-wrap items-start gap-3 {toc.length > 0 ? 'justify-between mb-3' : 'justify-end'}"
+						>
+							{#if toc.length > 0}
+								<h2 id="toc-heading" class="text-xl font-semibold text-primary">Contents</h2>
+							{/if}
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger>
 									{#snippet child({ props })}
@@ -176,9 +181,9 @@
 								</DropdownMenu.Content>
 							</DropdownMenu.Root>
 						</div>
-						{#if article.tableOfContents && article.tableOfContents.length > 0}
+						{#if toc.length > 0}
 							<ul class="space-y-1">
-								{#each article.tableOfContents as item}
+								{#each toc as item}
 									<li>
 										<a
 											href={`#${item.id}`}
@@ -189,10 +194,6 @@
 									</li>
 								{/each}
 							</ul>
-						{:else}
-							<p class="italic text-zinc-600 dark:text-gray-400">
-								No table of contents available
-							</p>
 						{/if}
 					</section>
 

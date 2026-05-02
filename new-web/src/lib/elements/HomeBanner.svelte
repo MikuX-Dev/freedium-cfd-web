@@ -146,7 +146,7 @@
      Keep fade-in additive so the rotate baseline survives the drift. */
   @keyframes sk-fade-in {
     from { opacity: 0; }
-    to   { opacity: 0.35; }
+    to   { opacity: 0.16; }
   }
   @keyframes sk-drift {
     0%, 100% { translate: 0 0; }
@@ -217,12 +217,12 @@
 
   @keyframes dot-pulse {
     0%   { opacity: 0; }
-    20%  { opacity: 0.7; }
-    60%  { opacity: 0.4; }
+    20%  { opacity: 0.35; }
+    60%  { opacity: 0.2; }
     100% { opacity: 0; }
   }
   @keyframes dot-ring {
-    0%   { transform: scale(1);   opacity: 0.6; }
+    0%   { transform: scale(1);   opacity: 0.3; }
     100% { transform: scale(5);   opacity: 0; }
   }
 
@@ -235,11 +235,11 @@
   @media (prefers-reduced-motion: reduce) {
     .skeleton {
       animation: none;
-      opacity: 0.4;
+      opacity: 0.16;
     }
     .sk-title { animation: none; }
     .dot, .dot::after { animation: none; }
-    .dot { opacity: 0.4; }
+    .dot { opacity: 0.2; }
   }
 
   .eyebrow {

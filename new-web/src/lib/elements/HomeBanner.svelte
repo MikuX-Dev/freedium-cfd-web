@@ -86,18 +86,15 @@
     z-index: 1;
   }
 
-  /* Decorative drifting article skeletons — pure background ambience. */
+  /* Decorative drifting article skeletons — pure background ambience.
+     No overflow clip and no mask — skeletons render fully. They sit
+     behind hero content via z-index and read as ambient through their
+     reduced opacity (set on .skeleton itself). */
   .hero-bg {
     position: absolute;
     inset: -40px 0;
     z-index: 0;
     pointer-events: none;
-    /* No overflow:hidden — let skeletons render whole rather than clip
-       at the box edges. The mask below softens overlap with the hero text. */
-    -webkit-mask-image:
-      radial-gradient(ellipse 38% 45% at 50% 50%, transparent 0%, #000 85%);
-    mask-image:
-      radial-gradient(ellipse 38% 45% at 50% 50%, transparent 0%, #000 85%);
   }
 
   .skeleton {
@@ -149,7 +146,7 @@
      Keep fade-in additive so the rotate baseline survives the drift. */
   @keyframes sk-fade-in {
     from { opacity: 0; }
-    to   { opacity: 0.55; }
+    to   { opacity: 0.35; }
   }
   @keyframes sk-drift {
     0%, 100% { translate: 0 0; }

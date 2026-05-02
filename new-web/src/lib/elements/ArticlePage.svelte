@@ -15,9 +15,11 @@
 	import HeroiconsChevronDown20Solid from '~icons/heroicons/chevron-down-20-solid';
 	import HeroiconsBars320Solid from '~icons/heroicons/bars-3-20-solid';
 	import { onMount } from 'svelte';
+	import { mode } from 'mode-watcher';
 	import { initializeCodeCopyButtons } from '$lib/codeCopy';
 	import { initializeLazyIframes } from '$lib/lazyIframe';
 	import { initializeImageZoom } from '$lib/imageZoom';
+	import { startIframeThemeSync } from '$lib/iframeTheme';
 	import type { ArticlePageData } from '$lib/types';
 
 	interface Props {
@@ -57,6 +59,19 @@
 			initializeLazyIframes();
 			initializeImageZoom();
 		}
+	});
+
+	// Keep iframe srcdoc in sync with the page theme: every time mode.current
+	// changes, refetch each iframe's HTML with the new theme and swap srcdoc.
+	// Initial run also catches dark-mode users on first load (iframes are
+	// always SSRed with the light variant since the server can't read the
+	// client's theme preference). State/scroll inside the iframe resets
+	// on each swap — that's the known cost of approach D.
+	$effect(() => {
+		if (!contentLoaded) return;
+		const theme: 'light' | 'dark' = mode.current === 'dark' ? 'dark' : 'light';
+		const dispose = startIframeThemeSync(() => theme);
+		return dispose;
 	});
 </script>
 

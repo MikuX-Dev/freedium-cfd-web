@@ -56,6 +56,62 @@ class AnchorType:
     USER: Final[str] = "USER"
 
 
+# Theme overrides injected into iframe srcdoc. The iframe is a sandboxed
+# document and its CSS can't see the parent's `.dark` class, so we bake
+# the theme directly into the markup. When the user toggles theme, the
+# frontend refetches a different variant via /api/iframe/{id}?theme=...
+# and swaps srcdoc in place. Light mode adds nothing — most embeds are
+# already styled for light backgrounds.
+_IFRAME_DARK_STYLES: Final[str] = """
+<style id="freedium-theme-overrides">
+body { background:#0c0c0c !important; color:#d4d4d4 !important; }
+a, .gist a { color:#58a6ff !important; }
+.gist,
+.gist .gist-data,
+.gist .gist-file,
+.gist .gist-meta,
+.gist .blob-wrapper,
+.gist .blob-code-inner,
+.gist .markdown-body,
+.gist .markdown-body pre,
+.gist .markdown-body code { background:#0c0c0c !important; color:#d4d4d4 !important; border-color:#2a2a2a !important; }
+.gist .blob-num { background:#161616 !important; color:#6a6a6a !important; border-color:#2a2a2a !important; }
+.gist .gist-meta,
+.gist .gist-meta strong { color:#888 !important; }
+.gist .pl-c  { color:#7a7a7a !important; }
+.gist .pl-s,
+.gist .pl-s1,
+.gist .pl-pds { color:#a5d6a7 !important; }
+.gist .pl-k,
+.gist .pl-kos { color:#ff7b72 !important; }
+.gist .pl-e,
+.gist .pl-en { color:#d2a8ff !important; }
+.gist .pl-c1,
+.gist .pl-cn { color:#79c0ff !important; }
+.gist .pl-v   { color:#ffa657 !important; }
+</style>
+"""
+
+
+def inject_iframe_theme(html: str, theme: str) -> str:
+    """Bake theme-specific CSS into iframe srcdoc HTML.
+
+    `theme` is one of 'light' or 'dark'. Light is a no-op since the
+    upstream embed (GitHub gist, etc.) is already styled for light.
+    Dark prepends a `<style>` block with overrides scoped to the body
+    and common gist selectors.
+
+    Placed before </body> so the override stylesheet wins over the
+    embed's own styles via cascade order. Falls back to appending if
+    the document is missing </body>.
+    """
+    if theme != "dark":
+        return html
+    if "</body>" in html:
+        return html.replace("</body>", _IFRAME_DARK_STYLES + "</body>", 1)
+    return html + _IFRAME_DARK_STYLES
+
+
 @dataclass(slots=True)
 class MarkupSpan:
     """Represents a formatted text span with start/end positions and formatting markers."""
@@ -1081,6 +1137,10 @@ class MediumMarkdownRenderer:
                         "document.domain = document.domain",
                         'console.log("[FREEDIUM] iframe workaround started")'
                     )
+                    # Bake theme-specific CSS into the srcdoc. The frontend can
+                    # refetch a different theme variant via /api/iframe/{id}
+                    # when the page theme toggles.
+                    patched_html = inject_iframe_theme(patched_html, "light")
 
                     # Escape double quotes for srcdoc attribute
                     # Note: We need to escape & first, then ", otherwise we'd double-escape
@@ -1094,6 +1154,10 @@ class MediumMarkdownRenderer:
                         iframe_attrs.append(f'height="{iframe_height}"')
                     iframe_attrs.append('frameborder="0"')
                     iframe_attrs.append('allowfullscreen')
+                    # data-iframe-id / data-iframe-theme let the frontend match
+                    # this rendered iframe back to /api/iframe/{id} on theme toggle.
+                    iframe_attrs.append(f'data-iframe-id="{iframe_id}"')
+                    iframe_attrs.append('data-iframe-theme="light"')
                     iframe_attrs.append(f'srcdoc="{escaped_html}"')
 
                     attrs_str = " ".join(iframe_attrs)

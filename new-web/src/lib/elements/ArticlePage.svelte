@@ -20,7 +20,8 @@
 	import { initializeLazyIframes } from '$lib/lazyIframe';
 	import { initializeImageZoom } from '$lib/imageZoom';
 	import { startIframeThemeSync } from '$lib/iframeTheme';
-	import { resolveIframesInMarkdown } from '$lib/gistResolver';
+	import { resolveGists } from '@/services';
+	import { toast } from 'svelte-sonner';
 	import type { ArticlePageData } from '$lib/types';
 
 	interface Props {
@@ -40,11 +41,18 @@
 	const isDesktop = mediaQuery('(min-width: 1024px)');
 	let drawerOpen = $state(false);
 
-	function downloadMarkdown() {
+	async function downloadMarkdown() {
 		if (!markdown || !article) return;
 
-		const resolved = resolveIframesInMarkdown(markdown);
-		const blob = new Blob([resolved], { type: 'text/markdown;charset=utf-8' });
+		let body = markdown;
+		try {
+			body = await resolveGists(markdown);
+		} catch (err) {
+			console.warn('Failed to resolve gists, downloading raw markdown:', err);
+			toast.warning('Could not inline gist code; downloading raw markdown');
+		}
+
+		const blob = new Blob([body], { type: 'text/markdown;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;

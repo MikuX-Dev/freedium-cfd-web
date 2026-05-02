@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -9,6 +11,15 @@ from freedium_library.services.medium.gist_resolver import (
 class ResolveGistsRequest(BaseModel):
     markdown: str = Field(
         ..., description="Markdown text containing iframe gist embeds to resolve."
+    )
+    mode: Literal["raw", "rich"] = Field(
+        "raw",
+        description=(
+            "Resolution strategy. 'raw' (default) fetches one /raw URL per "
+            "gist — bare code fence, no filename, first file only. 'rich' "
+            "fetches the gist's HTML page plus each file's raw URL — "
+            "preserves filename, language, and multi-file structure."
+        ),
     )
 
 
@@ -22,7 +33,7 @@ def register_markdown_router(router: APIRouter) -> None:
     markdown_router = APIRouter(prefix="/markdown")
 
     async def resolve_gists(body: ResolveGistsRequest) -> ResolveGistsResponse:
-        resolved = await resolve_gists_in_markdown(body.markdown)
+        resolved = await resolve_gists_in_markdown(body.markdown, mode=body.mode)
         return ResolveGistsResponse(markdown=resolved)
 
     markdown_router.add_api_route(

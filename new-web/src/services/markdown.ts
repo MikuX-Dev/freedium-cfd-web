@@ -1,8 +1,4 @@
-import apiFetch from "@/api";
-
-interface ResolveGistsResponse {
-	markdown: string;
-}
+import config from "@/config";
 
 /** Strategy for resolving gist iframes:
  *  - `raw`: one GET to /raw per gist, bare ``` fences, no filename/language,
@@ -11,21 +7,13 @@ interface ResolveGistsResponse {
  *    ```lang fences, full multi-file support — more requests, more bytes. */
 export type ResolveGistsMode = "raw" | "rich";
 
-/** Ask the backend to replace gist iframes inside the rendered markdown
- * with markdown code fences. Used for the article download flow so the
- * saved .md contains real source code instead of raw iframe HTML. */
-export async function resolveGists(
-	markdown: string,
+/** URL of the backend's article download endpoint. The browser handles the
+ * download natively via Content-Disposition; the frontend just needs to
+ * navigate to this URL (e.g. via `<a>.click()`). */
+export function articleDownloadUrl(
+	slug: string,
 	mode: ResolveGistsMode = "raw",
-): Promise<string> {
-	const response = await apiFetch<ResolveGistsResponse>(
-		"/markdown/resolve-gists",
-		{
-			method: "POST",
-			body: JSON.stringify({ markdown, mode }),
-			headers: { "Content-Type": "application/json" },
-		},
-	);
-	if (!response) throw new Error("Failed to resolve gists");
-	return response.markdown;
+): string {
+	const params = new URLSearchParams({ url: slug, mode });
+	return `${config.API_URL}/articles/download?${params}`;
 }

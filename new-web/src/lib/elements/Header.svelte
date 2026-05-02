@@ -53,7 +53,7 @@
     <!-- Logo -->
     <a class="brand-link" href="/">
       <span class="brand-mark"><span class="brand-dot">·</span> Freedium</span>
-      <span class="brand-tag">beta</span>
+      <span class="brand-tag"><sup>beta</sup></span>
     </a>
 
     <!-- Desktop Navigation -->
@@ -170,15 +170,13 @@
   .brand-dot { color: var(--accent); }
 
   .brand-tag {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-    border: 1px solid var(--line-2);
-    padding: 2px 6px;
-    border-radius: 3px;
-    background: var(--bg-2);
+    font-family: var(--font-serif);
+    font-size: 13px;
+    font-style: italic;
+    color: var(--ink-4);
+    margin-left: -4px;
+    align-self: flex-start;
+    line-height: 1;
   }
 
   .mobile-menu {

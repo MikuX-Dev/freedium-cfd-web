@@ -89,7 +89,7 @@
   /* Decorative drifting article skeletons — pure background ambience. */
   .hero-bg {
     position: absolute;
-    inset: -40px -40vw;
+    inset: -40px 0;
     z-index: 0;
     pointer-events: none;
     overflow: hidden;

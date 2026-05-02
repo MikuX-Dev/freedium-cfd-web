@@ -5,13 +5,17 @@ instead of a slab of HTML the user can't read on its own.
 
 The iframes the renderer embeds carry only a `<script src="…/USER/ID.js">`
 tag in their srcdoc — GitHub injects the rendered code at runtime, so
-nothing useful is parseable in the static HTML. To get real code we
-extract the gist id from that script URL and fetch the gist's files
-straight from `api.github.com/gists/<id>`.
+nothing useful is parseable in the static HTML. To resolve gists we hit
+`gist.github.com` URLs directly (not the rate-limited api.github.com):
 
-Results are cached in-process with a short TTL so repeated downloads
-of the same article don't hammer GitHub's unauthenticated rate limit
-(60 req/hr/IP).
+  1. Fetch the gist's HTML page to enumerate every file and grab each
+     file's "view raw" link, which embeds the filename and commit SHA.
+  2. Fetch each raw URL — `gist.github.com/USER/ID/raw/SHA/FILENAME`
+     resolves to the canonical raw content with original whitespace
+     preserved (the rendered HTML mangles indentation).
+
+Results are cached in-process with a short TTL so repeated downloads of
+the same article don't pile on extra requests.
 """
 
 from __future__ import annotations
@@ -25,19 +29,18 @@ from typing import Final
 
 import httpx
 from beartype import beartype
+from bs4 import BeautifulSoup, Tag
 from loguru import logger
 
 # <iframe ... data-iframe-id="..." ... srcdoc="..." ... ></iframe>
-# srcdoc is non-greedy so multiple iframes don't merge.
 _IFRAME_RE: Final[re.Pattern[str]] = re.compile(
     r'<iframe\b[^>]*?data-iframe-id="([^"]+)"[^>]*?srcdoc="(.*?)"[^>]*?></iframe>',
     re.DOTALL,
 )
 
-# Inside an unescaped srcdoc: <script src="https://gist.github.com/USER/HEX.js">.
-# The id is the hex-only second path segment.
+# Inside an unescaped srcdoc: <script src="https://gist.github.com/USER/HEX.js">
 _GIST_SCRIPT_RE: Final[re.Pattern[str]] = re.compile(
-    r'<script[^>]*\bsrc="https://gist\.github\.com/[^/"]+/([a-fA-F0-9]+)\.js"',
+    r'<script[^>]*\bsrc="https://gist\.github\.com/([^/"]+)/([a-fA-F0-9]+)\.js"',
 )
 
 _EXT_TO_LANG: Final[dict[str, str]] = {
@@ -80,8 +83,7 @@ _EXT_TO_LANG: Final[dict[str, str]] = {
     "sql": "sql",
 }
 
-# GitHub language label → markdown fence label. Lowercased label is the
-# fallback, but a few names need explicit overrides.
+# GitHub's `class="type-…"` label → markdown fence label.
 _GH_LANG_OVERRIDES: Final[dict[str, str]] = {
     "c++": "cpp",
     "c#": "csharp",
@@ -90,8 +92,15 @@ _GH_LANG_OVERRIDES: Final[dict[str, str]] = {
     "shell": "bash",
 }
 
-_GIST_CACHE_TTL_SECONDS: Final[float] = 600.0  # 10 min — gists rarely change
+_GIST_BASE: Final[str] = "https://gist.github.com"
+_GIST_CACHE_TTL_SECONDS: Final[float] = 600.0
 _GIST_REQUEST_TIMEOUT_SECONDS: Final[float] = 10.0
+
+
+@dataclass(slots=True, frozen=True)
+class GistRef:
+    user: str
+    gist_id: str
 
 
 @dataclass(slots=True, frozen=True)
@@ -101,9 +110,9 @@ class GistFile:
     code: str
 
 
-_cache: dict[str, tuple[float, list[GistFile] | None]] = {}
+_cache: dict[GistRef, tuple[float, list[GistFile] | None]] = {}
 _cache_lock = asyncio.Lock()
-_inflight: dict[str, asyncio.Task[list[GistFile] | None]] = {}
+_inflight: dict[GistRef, asyncio.Task[list[GistFile] | None]] = {}
 
 
 @beartype
@@ -112,7 +121,6 @@ def _infer_lang(filename: str, gh_language: str | None = None) -> str:
         key = gh_language.strip().lower()
         if key in _GH_LANG_OVERRIDES:
             return _GH_LANG_OVERRIDES[key]
-        # Whitespace and special chars don't belong in a fence label.
         if key and key.replace("-", "").replace("+", "").isalnum():
             return key
     lower = filename.lower()
@@ -132,57 +140,93 @@ def _render_files(files: list[GistFile]) -> str:
 
 
 @beartype
-async def _fetch_gist(
-    gist_id: str, client: httpx.AsyncClient
-) -> list[GistFile] | None:
-    """Fetch gist files via GitHub API. Returns None on any failure
-    (404, rate-limit, network) so the caller can leave the iframe intact."""
-    url = f"https://api.github.com/gists/{gist_id}"
+def _extract_lang_from_block(file_block: Tag) -> str:
+    """GitHub stamps the language onto each .blob-wrapper as `type-<lang>`."""
+    for el in file_block.select("[class*='type-']"):
+        classes = el.get("class") or []
+        if not isinstance(classes, list):
+            continue
+        for cls in classes:
+            if isinstance(cls, str) and cls.startswith("type-"):
+                return cls[len("type-") :]
+    return ""
+
+
+@beartype
+async def _fetch_raw(client: httpx.AsyncClient, url: str) -> str | None:
     try:
-        resp = await client.get(
-            url,
-            headers={"Accept": "application/vnd.github+json"},
-            timeout=_GIST_REQUEST_TIMEOUT_SECONDS,
-        )
+        resp = await client.get(url, timeout=_GIST_REQUEST_TIMEOUT_SECONDS)
     except httpx.RequestError as exc:
-        logger.warning(f"Gist fetch network error for {gist_id}: {exc}")
+        logger.warning(f"Gist raw fetch error for {url}: {exc}")
         return None
     if resp.status_code != 200:
+        logger.warning(f"Gist raw fetch failed: HTTP {resp.status_code} for {url}")
+        return None
+    return resp.text
+
+
+@beartype
+async def _fetch_gist(
+    ref: GistRef, client: httpx.AsyncClient
+) -> list[GistFile] | None:
+    """Resolve a gist's files via gist.github.com URLs only.
+
+    Step 1: GET the HTML page, enumerate files, capture each file's raw
+    URL (which carries the commit SHA + filename) and language hint.
+    Step 2: GET each raw URL in parallel for the canonical content.
+
+    Returns None on any non-recoverable failure (network, missing page,
+    empty file list) so the caller can leave the iframe intact.
+    """
+    page_url = f"{_GIST_BASE}/{ref.user}/{ref.gist_id}"
+    try:
+        page_resp = await client.get(
+            page_url, timeout=_GIST_REQUEST_TIMEOUT_SECONDS
+        )
+    except httpx.RequestError as exc:
         logger.warning(
-            f"Gist fetch failed for {gist_id}: HTTP {resp.status_code}"
+            f"Gist page fetch error for {ref.user}/{ref.gist_id}: {exc}"
         )
         return None
-    try:
-        data = resp.json()
-    except ValueError as exc:
-        logger.warning(f"Gist {gist_id} returned non-JSON: {exc}")
+    if page_resp.status_code != 200:
+        logger.warning(
+            f"Gist page fetch failed: HTTP {page_resp.status_code} for "
+            f"{ref.user}/{ref.gist_id}"
+        )
         return None
 
-    files: list[GistFile] = []
-    for fname, fdata in (data.get("files") or {}).items():
-        if not isinstance(fdata, dict):
+    soup = BeautifulSoup(page_resp.text, "html.parser")
+    metas: list[tuple[str, str, str]] = []  # (filename, raw_url, gh_lang)
+    for block in soup.select(".file"):
+        if not isinstance(block, Tag):
             continue
-        # GitHub truncates files >1MB and stores a partial in `content`. We
-        # fall back to fetching `raw_url` when truncated to recover the rest.
-        content = fdata.get("content") or ""
-        if fdata.get("truncated") and (raw_url := fdata.get("raw_url")):
-            try:
-                raw_resp = await client.get(
-                    raw_url, timeout=_GIST_REQUEST_TIMEOUT_SECONDS
-                )
-                if raw_resp.status_code == 200:
-                    content = raw_resp.text
-            except httpx.RequestError as exc:
-                logger.warning(
-                    f"Gist {gist_id} raw fetch failed for {fname}: {exc}"
-                )
-        if not content:
+        raw_link = block.select_one('.file-actions a[href*="/raw/"]')
+        if raw_link is None:
+            continue
+        href = raw_link.get("href")
+        if not isinstance(href, str) or not href:
+            continue
+        filename = href.rsplit("/", 1)[-1] or "gist"
+        full_url = href if href.startswith("http") else f"{_GIST_BASE}{href}"
+        metas.append((filename, full_url, _extract_lang_from_block(block)))
+
+    if not metas:
+        logger.warning(f"No files found on gist page {ref.user}/{ref.gist_id}")
+        return None
+
+    contents = await asyncio.gather(
+        *[_fetch_raw(client, url) for _, url, _ in metas]
+    )
+
+    files: list[GistFile] = []
+    for (filename, _, gh_lang), code in zip(metas, contents):
+        if not code:
             continue
         files.append(
             GistFile(
-                filename=fname,
-                lang=_infer_lang(fname, fdata.get("language")),
-                code=content,
+                filename=filename,
+                lang=_infer_lang(filename, gh_lang),
+                code=code,
             )
         )
     return files or None
@@ -190,33 +234,33 @@ async def _fetch_gist(
 
 @beartype
 async def _get_gist_cached(
-    gist_id: str, client: httpx.AsyncClient
+    ref: GistRef, client: httpx.AsyncClient
 ) -> list[GistFile] | None:
-    """Return cached gist files if fresh, else fetch (deduping concurrent
-    requests for the same id)."""
     now = time.monotonic()
     async with _cache_lock:
-        cached = _cache.get(gist_id)
+        cached = _cache.get(ref)
         if cached and now - cached[0] < _GIST_CACHE_TTL_SECONDS:
             return cached[1]
-        task = _inflight.get(gist_id)
+        task = _inflight.get(ref)
         is_originator = task is None
         if is_originator:
-            task = asyncio.create_task(_fetch_gist(gist_id, client))
-            _inflight[gist_id] = task
+            task = asyncio.create_task(_fetch_gist(ref, client))
+            _inflight[ref] = task
     assert task is not None
     files = await task
     if is_originator:
         async with _cache_lock:
-            _inflight.pop(gist_id, None)
-            _cache[gist_id] = (time.monotonic(), files)
+            _inflight.pop(ref, None)
+            _cache[ref] = (time.monotonic(), files)
     return files
 
 
 @beartype
-def _extract_gist_id(srcdoc_unescaped: str) -> str | None:
+def _extract_gist_ref(srcdoc_unescaped: str) -> GistRef | None:
     m = _GIST_SCRIPT_RE.search(srcdoc_unescaped)
-    return m.group(1) if m else None
+    if not m:
+        return None
+    return GistRef(user=m.group(1), gist_id=m.group(2))
 
 
 @beartype
@@ -226,35 +270,33 @@ async def resolve_gists_in_markdown(markdown: str) -> str:
     gist. Iframes that aren't gists, or whose fetch fails, pass through
     untouched.
     """
-    # Pass 1: collect distinct gist ids to fetch
-    gist_ids: list[str] = []
-    seen: set[str] = set()
+    refs: list[GistRef] = []
+    seen: set[GistRef] = set()
     for m in _IFRAME_RE.finditer(markdown):
         srcdoc = html.unescape(m.group(2))
-        gid = _extract_gist_id(srcdoc)
-        if gid and gid not in seen:
-            seen.add(gid)
-            gist_ids.append(gid)
+        ref = _extract_gist_ref(srcdoc)
+        if ref and ref not in seen:
+            seen.add(ref)
+            refs.append(ref)
 
-    if not gist_ids:
+    if not refs:
         return markdown
 
-    # Fetch all in parallel through one connection pool
     async with httpx.AsyncClient(
-        headers={"User-Agent": "freedium/1.0"}
+        headers={"User-Agent": "freedium/1.0"},
+        follow_redirects=True,
     ) as client:
         results = await asyncio.gather(
-            *[_get_gist_cached(gid, client) for gid in gist_ids]
+            *[_get_gist_cached(ref, client) for ref in refs]
         )
-    files_by_id: dict[str, list[GistFile] | None] = dict(zip(gist_ids, results))
+    files_by_ref: dict[GistRef, list[GistFile] | None] = dict(zip(refs, results))
 
-    # Pass 2: substitute iframes whose gist resolved successfully
     def replace(match: re.Match[str]) -> str:
         srcdoc = html.unescape(match.group(2))
-        gid = _extract_gist_id(srcdoc)
-        if not gid:
+        ref = _extract_gist_ref(srcdoc)
+        if not ref:
             return match.group(0)
-        files = files_by_id.get(gid)
+        files = files_by_ref.get(ref)
         if not files:
             return match.group(0)
         return _render_files(files)

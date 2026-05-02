@@ -30,12 +30,17 @@
 <div
 	bind:this={progress}
 	id="progress"
-	class="top-0 z-20 h-1"
+	class="h-1"
 	style="background:linear-gradient(to right, var(--accent) var(--scroll), transparent 0); width: var(--scroll, 0%);"
 ></div>
 
 <style>
 	#progress {
+		position: fixed;
+		top: 0;
+		left: 0;
+		z-index: 60;
 		transition: width 0.3s ease;
+		pointer-events: none;
 	}
 </style>

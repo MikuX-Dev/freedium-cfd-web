@@ -42,13 +42,13 @@
   const toggleSearch = () => { isSearchOpen = !isSearchOpen; };
 </script>
 
+<ProgressLine />
+
 <nav
   id="header"
   class="header-nav"
   style="transform: translateY({isHeaderVisible ? '0' : '-100%'})"
 >
-  <ProgressLine />
-
   <div class="container flex items-center justify-between h-14 px-4 mx-auto">
     <!-- Logo -->
     <a class="brand-link" href="/">

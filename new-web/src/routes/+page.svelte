@@ -4,11 +4,17 @@
   import BlogCard from '$lib/elements/BlogCard.svelte';
   import Footer from '$lib/elements/Footer.svelte';
   import type { BlogPost } from '$lib/types';
+  import type { PageData } from './$types';
+
+  let { data }: { data: PageData } = $props();
 
   let activeFilter = $state('Latest');
   const filters = ['Latest', 'Trending', 'This week', 'Long reads', 'Following'];
 
-  const blogPosts: Omit<BlogPost, 'id'>[] = [
+  // Fallback seed: shown only when the backend has not yet recorded any
+  // unlocks. Acts as visual scaffolding so first-run / dev-without-backend
+  // still renders a populated page.
+  const seedPosts: Omit<BlogPost, 'id'>[] = [
     {
       cardType: 'featured',
       title: 'Ten quiet habits of genuinely productive remote workers.',
@@ -129,7 +135,10 @@
     },
   ];
 
-  const items: BlogPost[] = blogPosts.map((post, index) => ({ ...post, id: index }));
+  const seedItems: BlogPost[] = seedPosts.map((post, index) => ({ ...post, id: index }));
+  const items = $derived<BlogPost[]>(
+    data.items.length > 0 ? data.items : seedItems,
+  );
 </script>
 
 <svelte:head>

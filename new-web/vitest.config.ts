@@ -1,13 +1,12 @@
-import { sveltekit } from "@sveltejs/kit/vite";
-import { defineConfig } from "vitest/config";
+import { mergeConfig, defineConfig } from "vitest/config";
+import viteConfig from "./vite.config";
 
-export default defineConfig({
-    plugins: [sveltekit()],
-    test: {
-        environment: "node",
-        include: ["src/**/*.{test,spec}.ts"],
-    },
-    resolve: {
-        alias: { "@": "./src" },
-    },
-});
+export default mergeConfig(
+    viteConfig,
+    defineConfig({
+        test: {
+            environment: "node",
+            include: ["src/**/*.{test,spec}.ts"],
+        },
+    }),
+);

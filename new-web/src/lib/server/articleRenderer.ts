@@ -10,7 +10,7 @@ import { h, s } from "hastscript";
 import type { Element, Root } from "hast";
 import { getIconData, iconToSVG } from "@iconify/utils";
 import heroiconsData from "@iconify/json/json/heroicons.json";
-import rehypeExternalLinks, { type Options as RehypeExternalLinksOptions } from "rehype-external-links";
+import rehypeExternalLinks from "rehype-external-links";
 import rehypeSlug from "rehype-slug";
 import FrontMatter from "front-matter";
 
@@ -106,47 +106,6 @@ function createCodeCopyButton(code: string, toggleMs: number = 3000): string {
 	);
 
 	return toHtml(button, { allowDangerousHtml: true });
-}
-
-async function createHighlightedCode(code: string, lang: string | null = "text"): Promise<string> {
-	const highlighter = await getHighlighter();
-	const language = lang ?? "text";
-
-	const lightHtml = highlighter.codeToHtml(code, {
-		lang: language,
-		theme: "github-light",
-		transformers: [
-			{
-				code(node) {
-					node.properties = { ...node.properties, ...CODE_ATTRIBUTES };
-					return node;
-				},
-			},
-		],
-	});
-
-	const darkHtml = highlighter.codeToHtml(code, {
-		lang: language,
-		theme: "github-dark",
-		transformers: [
-			{
-				code(node) {
-					node.properties = { ...node.properties, ...CODE_ATTRIBUTES };
-					return node;
-				},
-			},
-		],
-	});
-
-	const buttonHtml = createCodeCopyButton(code, 1200);
-
-	return `
-		<div class="relative">
-			${buttonHtml}
-			<div class="dark:hidden">${lightHtml}</div>
-			<div class="hidden dark:block">${darkHtml}</div>
-		</div>
-	`;
 }
 
 // Rehype plugin for syntax highlighting

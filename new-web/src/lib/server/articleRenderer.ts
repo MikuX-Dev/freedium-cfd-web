@@ -231,6 +231,27 @@ function extractYouTubeId(src: string): string | null {
 	return null;
 }
 
+function escapeHtml(s: string): string {
+	return s
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
+function buildIframeFallbackLink(src: string): string {
+	try {
+		const u = new URL(src);
+		if (u.protocol !== "http:" && u.protocol !== "https:") {
+			return `<a href="#">[Embed]</a>`;
+		}
+		return `<a href="${escapeHtml(src)}">[Embed: ${escapeHtml(u.hostname)}]</a>`;
+	} catch {
+		return `<a href="#">[Embed]</a>`;
+	}
+}
+
 function transformIframeHtml(iframeHtml: string): string {
 	const srcMatch = iframeHtml.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
 	if (!srcMatch) return iframeHtml;
@@ -246,11 +267,7 @@ function transformIframeHtml(iframeHtml: string): string {
 		);
 	}
 
-	try {
-		return `<a href="${src}">[Embed: ${new URL(src).hostname}]</a>`;
-	} catch {
-		return `<a href="${src}">[Embed]</a>`;
-	}
+	return buildIframeFallbackLink(src);
 }
 
 function rehypeIframeToThumbnail() {
@@ -279,7 +296,7 @@ function rehypeIframeToThumbnail() {
 					}
 				: {
 						type: "raw" as const,
-						value: `<a href="${src}">[Embed: ${new URL(src).hostname}]</a>`,
+						value: buildIframeFallbackLink(src),
 					};
 
 			parent.children[index] = replacement;
@@ -289,7 +306,9 @@ function rehypeIframeToThumbnail() {
 		visit(tree, "raw" as any, (node: any) => {
 			if (typeof node.value !== "string") return;
 			if (!/<iframe\b/i.test(node.value)) return;
-			node.value = node.value.replace(/<iframe\b[^>]*>\s*<\/iframe>/gi, (match: string) =>
+			// Lazy [\s\S]*? matches iframes with body content (e.g., fallback text)
+			// without gobbling across two adjacent iframes.
+			node.value = node.value.replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, (match: string) =>
 				transformIframeHtml(match),
 			);
 			// Also handle self-closing or void-style iframes just in case.

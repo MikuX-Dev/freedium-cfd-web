@@ -83,4 +83,43 @@ describe("renderArticle (print) — iframes", () => {
         const { html } = await renderArticle("slug", { mode: "web" });
         expect(html).toMatch(/<iframe[^>]*youtube/);
     });
+
+    it("transforms a YouTube iframe even when it has fallback body content", async () => {
+        // Inline-fixture test: this exercises the regex against the body-content shape
+        // (Medium emits these with placeholder text inside the iframe). The default
+        // fixture has only the empty-body shape.
+        const inlineMd = `<iframe src="https://www.youtube.com/embed/abcdefghijk">Video unavailable</iframe>`;
+
+        const { renderArticle: rerender } = await import("./articleRenderer");
+        const { render } = await import("@/services");
+        // @ts-ignore — vi.mock returns a vi.Fn but the static import surface is loose
+        (render as any).mockResolvedValueOnce({ markdown: inlineMd });
+
+        const { html } = await rerender("slug", { mode: "print" });
+        expect(html).not.toMatch(/<iframe/);
+        expect(html).toMatch(/img\.youtube\.com\/vi\/abcdefghijk\/maxresdefault\.jpg/);
+    });
+
+    it("HTML-escapes the src in non-YouTube iframe fallback", async () => {
+        const inlineMd = `<iframe src="https://example.com/?q=&lt;evil&gt;"></iframe>`;
+        const { renderArticle: rerender } = await import("./articleRenderer");
+        const { render } = await import("@/services");
+        (render as any).mockResolvedValueOnce({ markdown: inlineMd });
+
+        const { html } = await rerender("slug", { mode: "print" });
+        expect(html).not.toMatch(/<iframe/);
+        expect(html).toMatch(/\[Embed: example\.com\]/);
+        expect(html).toMatch(/href="https:\/\/example\.com/);
+    });
+
+    it("rejects javascript: scheme in iframe fallback", async () => {
+        const inlineMd = `<iframe src="javascript:alert(1)"></iframe>`;
+        const { renderArticle: rerender } = await import("./articleRenderer");
+        const { render } = await import("@/services");
+        (render as any).mockResolvedValueOnce({ markdown: inlineMd });
+
+        const { html } = await rerender("slug", { mode: "print" });
+        expect(html).not.toMatch(/javascript:/);
+        expect(html).toMatch(/href="#"/);
+    });
 });

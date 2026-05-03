@@ -23,3 +23,7 @@ class APIConfig(BaseConfig):
     HOST: str = Field(default="0.0.0.0")
     PORT: int = Field(default=7080)
     MAX_WORKERS: int = Field(default=10)
+    PDF_INTERNAL_SECRET: str = Field(
+        default="dev-pdf-secret-change-in-prod",
+        description="Shared secret required on POST /internal/pdf via X-Internal-Secret header.",
+    )

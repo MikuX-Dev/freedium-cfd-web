@@ -18,6 +18,7 @@
 	import { initializeImageZoom } from '$lib/imageZoom';
 	import { startIframeThemeSync } from '$lib/iframeTheme';
 	import { articleDownloadUrl } from '@/services';
+	import { generatePdf } from '$lib/article.remote';
 	import type { ArticlePageData } from '$lib/types';
 
 	interface Props {
@@ -41,6 +42,31 @@
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);
+	}
+
+	let pdfState = $state<'idle' | 'generating'>('idle');
+
+	async function downloadPdf() {
+		if (!data.slug || pdfState === 'generating') return;
+		pdfState = 'generating';
+		try {
+			const { bytes, filename } = await generatePdf(data.slug);
+			const blob = new Blob([bytes], { type: 'application/pdf' });
+			const url = URL.createObjectURL(blob);
+			const a = Object.assign(document.createElement('a'), {
+				href: url,
+				download: filename
+			});
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			console.error('PDF download failed:', err);
+			alert('PDF download failed. Please try again.');
+		} finally {
+			pdfState = 'idle';
+		}
 	}
 
 	onMount(() => {
@@ -170,9 +196,9 @@
 									{/snippet}
 								</DropdownMenu.Trigger>
 								<DropdownMenu.Content class="w-56" side="bottom" align="end">
-									<DropdownMenu.Item>
+									<DropdownMenu.Item onclick={downloadPdf} disabled={pdfState === 'generating'}>
 										<HeroiconsDocumentArrowDown20Solid class="size-4 text-red-500" />
-										Download as PDF
+										{pdfState === 'generating' ? 'Generating PDF…' : 'Download as PDF'}
 									</DropdownMenu.Item>
 									<DropdownMenu.Item onclick={downloadMarkdown}>
 										<HeroiconsDocumentText20Solid class="size-4 text-blue-500" />

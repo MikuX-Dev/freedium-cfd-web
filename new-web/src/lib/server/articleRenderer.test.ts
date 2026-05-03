@@ -35,3 +35,24 @@ describe("renderArticle (web mode)", () => {
         expect(markdown).toMatch(/# Section One/);
     });
 });
+
+describe("renderArticle (print mode)", () => {
+    it("emits ONLY the light Shiki block for code", async () => {
+        const { html } = await renderArticle("slug", { mode: "print" });
+        expect(html).not.toMatch(/dark:hidden/);
+        expect(html).not.toMatch(/hidden dark:block/);
+        // Still has shiki output (just one variant)
+        expect(html).toMatch(/class="shiki/);
+    });
+
+    it("does NOT emit a code-copy button in print mode", async () => {
+        const { html } = await renderArticle("slug", { mode: "print" });
+        expect(html).not.toMatch(/code-copy-btn/);
+    });
+
+    it("web mode is unchanged (regression)", async () => {
+        const { html } = await renderArticle("slug", { mode: "web" });
+        expect(html).toMatch(/dark:hidden/);
+        expect(html).toMatch(/code-copy-btn/);
+    });
+});

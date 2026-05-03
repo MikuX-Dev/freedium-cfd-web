@@ -109,7 +109,7 @@ function createCodeCopyButton(code: string, toggleMs: number = 3000): string {
 }
 
 // Rehype plugin for syntax highlighting
-function rehypeHighlight() {
+function rehypeHighlight(opts: { mode: RenderMode } = { mode: "web" }) {
 	return async (tree: Root) => {
 		const highlighter = await getHighlighter();
 		const nodesToReplace: Array<{ node: any; parent: any; index: number; replacement: any }> = [];
@@ -165,30 +165,37 @@ function rehypeHighlight() {
 						],
 					});
 
-					const darkHtml = highlighter.codeToHtml(codeText, {
-						lang,
-						theme: "github-dark",
-						decorations,
-						transformers: [
-							{
-								code(transformNode) {
-									transformNode.properties = { ...transformNode.properties, ...CODE_ATTRIBUTES };
-									return transformNode;
+					let wrappedHtml: string;
+					if (opts.mode === "print") {
+						// Print: single theme, no dark variant, no copy button.
+						wrappedHtml = lightHtml;
+					} else {
+						// Web: dual theme + copy button (existing behavior).
+						const darkHtml = highlighter.codeToHtml(codeText, {
+							lang,
+							theme: "github-dark",
+							decorations,
+							transformers: [
+								{
+									code(transformNode) {
+										transformNode.properties = { ...transformNode.properties, ...CODE_ATTRIBUTES };
+										return transformNode;
+									},
 								},
-							},
-						],
-					});
+							],
+						});
 
-					const buttonHtml = createCodeCopyButton(codeText, 1200);
+						const buttonHtml = createCodeCopyButton(codeText, 1200);
 
-					// Create replacement HTML
-					const wrappedHtml = `
+						// Create replacement HTML
+						wrappedHtml = `
 						<div class="relative">
 							${buttonHtml}
 							<div class="dark:hidden">${lightHtml}</div>
 							<div class="hidden dark:block">${darkHtml}</div>
 						</div>
 					`;
+					}
 
 					// Create a raw HTML node
 					const replacement = {
@@ -234,8 +241,7 @@ export async function renderArticle(
 	slug: string,
 	options: { mode?: RenderMode } = {},
 ): Promise<RenderResult> {
-	const _mode = options.mode ?? "web";
-	// (mode is unused in this task — wired up in Task 9.)
+	const mode = options.mode ?? "web";
 
 	const renderResult = await render(slug, true);
 	if (!renderResult) throw new Error("ARTICLE_NOT_FOUND");
@@ -323,7 +329,7 @@ export async function renderArticle(
 			rel: ["nofollow"],
 			content: externalLinkIcon,
 		})
-		.use(rehypeHighlight)
+		.use(rehypeHighlight, { mode })
 		.use(rehypeStringify, { allowDangerousHtml: true });
 
 	const result = await processor.process(markdownContent);

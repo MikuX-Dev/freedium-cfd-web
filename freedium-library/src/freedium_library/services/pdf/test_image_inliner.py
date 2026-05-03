@@ -21,3 +21,19 @@ async def test_inlines_simple_img(httpx_mock):
     expected_b64 = base64.b64encode(png_bytes).decode("ascii")
     assert f"data:image/png;base64,{expected_b64}" in out
     assert "https://cdn.example.com/a.png" not in out
+    assert "<p>x</p>" in out
+    assert 'alt="a"' in out
+
+
+@pytest.mark.asyncio
+async def test_preserves_leading_text_position(httpx_mock):
+    """Regression: text appearing before any tag must stay at the start."""
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+    httpx_mock.add_response(
+        url="https://cdn.example.com/lead.png",
+        content=png_bytes,
+        headers={"content-type": "image/png"},
+    )
+    html_in = 'Leading text before tags. <img src="https://cdn.example.com/lead.png">'
+    out = await inline_images(html_in)
+    assert out.startswith("Leading text before tags.")

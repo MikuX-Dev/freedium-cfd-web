@@ -1,9 +1,9 @@
 """Concurrent image pre-fetch + base64 inline for WeasyPrint input HTML.
 
 WeasyPrint will fetch remote images serially and one slow URL stalls the
-whole render. We download every <img src> / <source srcset> URL up front
-in parallel, encode as data: URI, and rewrite the HTML so WeasyPrint does
-zero network I/O at render time.
+whole render. We download every <img src> URL up front in parallel,
+encode as data: URI, and rewrite the HTML so WeasyPrint does zero
+network I/O at render time.
 """
 
 from __future__ import annotations
@@ -87,4 +87,4 @@ async def inline_images(html_str: str) -> str:
         lxml_html.tostring(child, encoding="unicode")  # type: ignore[assignment]
         for child in tree
     ]
-    return "".join(parts) + (tree.text or "")
+    return (tree.text or "") + "".join(parts)

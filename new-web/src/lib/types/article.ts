@@ -26,7 +26,7 @@ export interface Article {
 	title: string;
 	subtitle?: string;
 	date: string;
-	url?: string;
+	url?: string | null;
 	postImage?: string | null;
 	postImageZoom?: string | null;
 	postImageCaption?: string;

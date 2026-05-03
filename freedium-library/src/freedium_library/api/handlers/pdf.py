@@ -25,6 +25,7 @@ class PdfRequest(BaseModel):
         ...,
         min_length=1,
         max_length=255,
+        pattern=r'^[^\r\n"\\/]+$',
         description="Filename for Content-Disposition (no path).",
     )
 
@@ -52,12 +53,16 @@ def register_pdf_router(router: APIRouter, secret: str) -> None:
     ) -> Response:
         try:
             inlined_html = await inline_images(req.html)
+        except HTTPException:
+            raise
         except Exception as exc:
-            logger.error(f"inline_images failed: {exc!r}")
+            logger.warning(f"inline_images failed: {exc!r}")
             raise HTTPException(status_code=400, detail="HTML parse failed") from exc
 
         try:
             pdf_bytes = render_pdf(inlined_html)
+        except HTTPException:
+            raise
         except Exception as exc:
             logger.exception("WeasyPrint render failed")
             raise HTTPException(status_code=502, detail="PDF render failed") from exc

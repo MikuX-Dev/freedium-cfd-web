@@ -65,3 +65,33 @@ def test_inlines_images_before_render(httpx_mock):
     )
     assert res.status_code == 200
     assert res.content.startswith(b"%PDF-")
+
+
+def test_rejects_oversized_filename():
+    client = _make_app(secret="s")
+    res = client.post(
+        "/internal/pdf",
+        json={"html": "<p>x</p>", "filename": "x" * 300},
+        headers={"X-Internal-Secret": "s"},
+    )
+    assert res.status_code == 422
+
+
+def test_rejects_filename_with_crlf():
+    client = _make_app(secret="s")
+    res = client.post(
+        "/internal/pdf",
+        json={"html": "<p>x</p>", "filename": 'evil.pdf"\r\nX-Injected: yes'},
+        headers={"X-Internal-Secret": "s"},
+    )
+    assert res.status_code == 422
+
+
+def test_rejects_filename_with_path_separator():
+    client = _make_app(secret="s")
+    res = client.post(
+        "/internal/pdf",
+        json={"html": "<p>x</p>", "filename": "../etc/passwd.pdf"},
+        headers={"X-Internal-Secret": "s"},
+    )
+    assert res.status_code == 422

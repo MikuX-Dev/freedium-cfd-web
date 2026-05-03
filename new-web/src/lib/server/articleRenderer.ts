@@ -327,7 +327,7 @@ export async function renderArticle(
 		.use(rehypeExternalLinks, {
 			target: "_blank",
 			rel: ["nofollow"],
-			content: externalLinkIcon,
+			content: mode === "print" ? undefined : externalLinkIcon,
 		})
 		.use(rehypeHighlight, { mode })
 		.use(rehypeStringify, { allowDangerousHtml: true });

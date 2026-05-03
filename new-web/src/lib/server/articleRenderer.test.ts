@@ -56,3 +56,16 @@ describe("renderArticle (print mode)", () => {
         expect(html).toMatch(/code-copy-btn/);
     });
 });
+
+describe("renderArticle (print) — links", () => {
+    it("strips the external-link icon", async () => {
+        const { html } = await renderArticle("slug", { mode: "print" });
+        // No injected SVG (the web mode test asserts presence)
+        expect(html).not.toMatch(/<svg[^>]*aria-hidden="true"/);
+    });
+
+    it("keeps the link itself with the http href", async () => {
+        const { html } = await renderArticle("slug", { mode: "print" });
+        expect(html).toMatch(/<a[^>]*href="https:\/\/example\.com"/);
+    });
+});

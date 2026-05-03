@@ -59,6 +59,7 @@
 		"shiki-transformer-copy-button": "^0.0.3",
 		"svelte-bricks": "^0.3.2",
 		"unified": "^11.0.5",
-		"unist-util-visit": "^5.0.0"
+		"unist-util-visit": "^5.0.0",
+		"valibot": "^1.3.1"
 	}
 }

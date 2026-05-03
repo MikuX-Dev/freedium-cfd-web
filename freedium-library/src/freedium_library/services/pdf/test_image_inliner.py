@@ -1,4 +1,4 @@
-"""Tests for inline_images: walk HTML, replace remote img src/srcset with data: URIs."""
+"""Tests for inline_images: walk HTML, replace remote img src with data: URIs."""
 import base64
 
 import pytest

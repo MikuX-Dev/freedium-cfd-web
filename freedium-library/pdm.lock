@@ -5,7 +5,7 @@
 groups = ["default", "api", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:003d8cf76cbdd5ecb472e9f011a3a2b710192abd94dcd29b615fbd78d8c76352"
+content_hash = "sha256:2a858d07475e1d8f64b8a5381af5da81be046469470c028a4575ae592ec8afb0"
 
 [[metadata.targets]]
 requires_python = "==3.12.*"
@@ -1148,6 +1148,20 @@ files = [
     {file = "pymongo-4.15.5-cp312-cp312-win_amd64.whl", hash = "sha256:099d3e2dddfc75760c6a8fadfb99c1e88824a99c2c204a829601241dff9da049"},
     {file = "pymongo-4.15.5-cp312-cp312-win_arm64.whl", hash = "sha256:649cb906882c4058f467f334fb277083998ba5672ffec6a95d6700db577fd31a"},
     {file = "pymongo-4.15.5.tar.gz", hash = "sha256:3a8d6bf2610abe0c97c567cf98bf5bba3e90ccc93cc03c9dde75fa11e4267b42"},
+]
+
+[[package]]
+name = "pypdf"
+version = "6.10.2"
+requires_python = ">=3.9"
+summary = "A pure-python PDF library capable of splitting, merging, cropping, and transforming PDF files"
+groups = ["dev"]
+dependencies = [
+    "typing-extensions>=4.0; python_version < \"3.11\"",
+]
+files = [
+    {file = "pypdf-6.10.2-py3-none-any.whl", hash = "sha256:aa53be9826655b51c96741e5d7983ca224d898ac0a77896e64636810517624aa"},
+    {file = "pypdf-6.10.2.tar.gz", hash = "sha256:7d09ce108eff6bf67465d461b6ef352dcb8d84f7a91befc02f904455c6eea11d"},
 ]
 
 [[package]]

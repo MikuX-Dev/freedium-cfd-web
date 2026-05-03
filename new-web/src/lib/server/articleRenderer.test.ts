@@ -69,3 +69,18 @@ describe("renderArticle (print) — links", () => {
         expect(html).toMatch(/<a[^>]*href="https:\/\/example\.com"/);
     });
 });
+
+describe("renderArticle (print) — iframes", () => {
+    it("transforms a YouTube iframe into a thumbnail link", async () => {
+        const { html } = await renderArticle("slug", { mode: "print" });
+        expect(html).not.toMatch(/<iframe[^>]*youtube/);
+        expect(html).toMatch(/class="yt-link"/);
+        expect(html).toMatch(/img\.youtube\.com\/vi\/dQw4w9WgXcQ\/maxresdefault\.jpg/);
+        expect(html).toMatch(/youtube\.com\/watch\?v=dQw4w9WgXcQ/);
+    });
+
+    it("leaves iframes alone in web mode (regression)", async () => {
+        const { html } = await renderArticle("slug", { mode: "web" });
+        expect(html).toMatch(/<iframe[^>]*youtube/);
+    });
+});

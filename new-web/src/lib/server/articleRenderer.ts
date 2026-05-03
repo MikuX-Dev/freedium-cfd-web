@@ -217,6 +217,89 @@ function rehypeHighlight(opts: { mode: RenderMode } = { mode: "web" }) {
 	};
 }
 
+const YOUTUBE_PATTERNS = [
+	/youtube\.com\/embed\/([A-Za-z0-9_-]{6,15})/,
+	/youtube\.com\/watch\?v=([A-Za-z0-9_-]{6,15})/,
+	/youtu\.be\/([A-Za-z0-9_-]{6,15})/,
+];
+
+function extractYouTubeId(src: string): string | null {
+	for (const re of YOUTUBE_PATTERNS) {
+		const m = src.match(re);
+		if (m) return m[1];
+	}
+	return null;
+}
+
+function transformIframeHtml(iframeHtml: string): string {
+	const srcMatch = iframeHtml.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+	if (!srcMatch) return iframeHtml;
+	const src = srcMatch[1];
+
+	const ytId = extractYouTubeId(src);
+	if (ytId) {
+		return (
+			`<a class="yt-link" href="https://www.youtube.com/watch?v=${ytId}">` +
+			`<img class="yt-thumb" src="https://img.youtube.com/vi/${ytId}/maxresdefault.jpg" alt="YouTube video"/>` +
+			`<span class="yt-play">▶</span>` +
+			`</a>`
+		);
+	}
+
+	try {
+		return `<a href="${src}">[Embed: ${new URL(src).hostname}]</a>`;
+	} catch {
+		return `<a href="${src}">[Embed]</a>`;
+	}
+}
+
+function rehypeIframeToThumbnail() {
+	return (tree: Root) => {
+		// Iframes appear as either:
+		// 1. element nodes (when remark parses them as inline HTML inside paragraphs and rehype-raw runs), or
+		// 2. raw nodes (when remark-rehype { allowDangerousHtml: true } passes block-level HTML through).
+		// We handle both.
+
+		visit(tree, "element", (node: any, index: number | null | undefined, parent: any) => {
+			if (node.tagName !== "iframe") return;
+			if (!parent || typeof index !== "number") return;
+
+			const src = node.properties?.src;
+			if (typeof src !== "string") return;
+
+			const ytId = extractYouTubeId(src);
+			const replacement = ytId
+				? {
+						type: "raw" as const,
+						value:
+							`<a class="yt-link" href="https://www.youtube.com/watch?v=${ytId}">` +
+							`<img class="yt-thumb" src="https://img.youtube.com/vi/${ytId}/maxresdefault.jpg" alt="YouTube video"/>` +
+							`<span class="yt-play">▶</span>` +
+							`</a>`,
+					}
+				: {
+						type: "raw" as const,
+						value: `<a href="${src}">[Embed: ${new URL(src).hostname}]</a>`,
+					};
+
+			parent.children[index] = replacement;
+		});
+
+		// Transform raw HTML nodes whose value contains an <iframe>.
+		visit(tree, "raw" as any, (node: any) => {
+			if (typeof node.value !== "string") return;
+			if (!/<iframe\b/i.test(node.value)) return;
+			node.value = node.value.replace(/<iframe\b[^>]*>\s*<\/iframe>/gi, (match: string) =>
+				transformIframeHtml(match),
+			);
+			// Also handle self-closing or void-style iframes just in case.
+			node.value = node.value.replace(/<iframe\b[^>]*\/>/gi, (match: string) =>
+				transformIframeHtml(match),
+			);
+		});
+	};
+}
+
 export type RenderMode = "web" | "print";
 
 export interface ArticleMetadata {
@@ -320,7 +403,7 @@ export async function renderArticle(
 		console.warn("Failed to parse frontmatter:", error);
 	}
 
-	const processor = unified()
+	const baseProcessor = unified()
 		.use(remarkParse)
 		.use(remarkRehype, { allowDangerousHtml: true })
 		.use(rehypeSlug)
@@ -328,7 +411,12 @@ export async function renderArticle(
 			target: "_blank",
 			rel: ["nofollow"],
 			content: mode === "print" ? undefined : externalLinkIcon,
-		})
+		});
+
+	const withIframeTransform =
+		mode === "print" ? baseProcessor.use(rehypeIframeToThumbnail) : baseProcessor;
+
+	const processor = withIframeTransform
 		.use(rehypeHighlight, { mode })
 		.use(rehypeStringify, { allowDangerousHtml: true });
 

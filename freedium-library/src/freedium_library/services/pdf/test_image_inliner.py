@@ -1,7 +1,6 @@
 """Tests for inline_images: walk HTML, replace remote img src/srcset with data: URIs."""
 import base64
 
-import httpx
 import pytest
 
 from freedium_library.services.pdf.image_inliner import inline_images

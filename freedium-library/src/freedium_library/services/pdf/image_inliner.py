@@ -59,7 +59,7 @@ async def inline_images(html_str: str) -> str:
     """
     if not html_str:
         return html_str
-    tree = lxml_html.fragment_fromstring(html_str, create_parent="div")
+    tree = lxml_html.fragment_fromstring(html_str, create_parent="div")  # type: ignore[arg-type]
 
     urls: set[str] = set()
     for img in tree.iter("img"):
@@ -83,6 +83,8 @@ async def inline_images(html_str: str) -> str:
             img.set("src", mapping[src])
 
     # fragment_fromstring wrapped us in a <div>; serialize children only.
-    return "".join(
-        lxml_html.tostring(child, encoding="unicode") for child in tree
-    ) + (tree.text or "")
+    parts: list[str] = [
+        lxml_html.tostring(child, encoding="unicode")  # type: ignore[assignment]
+        for child in tree
+    ]
+    return "".join(parts) + (tree.text or "")

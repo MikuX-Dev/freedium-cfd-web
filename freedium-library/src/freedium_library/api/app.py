@@ -49,7 +49,7 @@ def create_application() -> FastAPI:
         lifespan=lifespan,
     )
 
-    register_router(app, settings.prefix_path)
+    register_router(app, settings.prefix_path, config=config)
     register_error_handler(app)
     register_middlewares(app)
 

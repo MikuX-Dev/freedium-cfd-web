@@ -8,6 +8,7 @@
 	export let alt = undefined;
 	/** @type {string | null | undefined} */
 	export let zoomSrc = undefined;
+	/** Pre-rendered HTML (markdown → HTML in articleRenderer). May be undefined. */
 	/** @type {string | undefined} */
 	export let caption = undefined;
 	/** @type {import('medium-zoom').ZoomOptions | undefined} */
@@ -15,8 +16,7 @@
 
 	/** @type {import('medium-zoom').Zoom | null} */
 	let zoom = null;
-	/** @type {HTMLDivElement | null} */
-	let captionElement = null;
+	let isZoomOpen = false;
 
 	function getZoom() {
 		if (zoom === null) {
@@ -25,48 +25,13 @@
 				margin: 24,
 			};
 			zoom = mediumZoom({ ...defaultOptions, ...options });
-
-			// Add event listeners to show/hide caption
-			zoom.on('open', (event) => {
-				/** @type {HTMLImageElement | null} */
-				const img = event.target instanceof HTMLImageElement ? event.target : null;
-				const captionText = img?.getAttribute('data-caption');
-
-				if (captionText && !captionElement) {
-					captionElement = document.createElement('div');
-					captionElement.style.position = 'fixed';
-					captionElement.style.bottom = '40px';
-					captionElement.style.left = '50%';
-					captionElement.style.transform = 'translateX(-50%)';
-					captionElement.style.color = 'white';
-					captionElement.style.fontSize = '16px';
-					captionElement.style.fontStyle = 'italic';
-					captionElement.style.textAlign = 'center';
-					captionElement.style.maxWidth = '80%';
-					captionElement.style.padding = '10px 20px';
-					captionElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-					captionElement.style.borderRadius = '8px';
-					captionElement.style.zIndex = '9999';
-					captionElement.style.pointerEvents = 'none';
-					captionElement.textContent = captionText;
-					document.body.appendChild(captionElement);
-				}
-			});
-
-			zoom.on('close', () => {
-				if (captionElement) {
-					captionElement.remove();
-					captionElement = null;
-				}
-			});
+			zoom.on('open', () => { isZoomOpen = true; });
+			zoom.on('close', () => { isZoomOpen = false; });
 		}
-
 		return zoom;
 	}
 
-	/**
-	 * @param {HTMLImageElement} image
-	 */
+	/** @param {HTMLImageElement} image */
 	function attachZoom(image) {
 		const zoom = getZoom();
 		zoom.attach(image);
@@ -83,11 +48,52 @@
 	}
 
 	onDestroy(() => {
-		if (captionElement) {
-			captionElement.remove();
-			captionElement = null;
-		}
+		isZoomOpen = false;
 	});
 </script>
 
-<img {src} {alt} data-zoom-src={zoomSrc} data-caption={caption} {...$$restProps} use:attachZoom />
+{#if caption}
+	<figure class="image-zoom-figure">
+		<img {src} {alt} data-zoom-src={zoomSrc} {...$$restProps} use:attachZoom />
+		<figcaption class="image-zoom-caption">{@html caption}</figcaption>
+	</figure>
+{:else}
+	<img {src} {alt} data-zoom-src={zoomSrc} {...$$restProps} use:attachZoom />
+{/if}
+
+{#if isZoomOpen && caption}
+	<div class="image-zoom-overlay-caption">{@html caption}</div>
+{/if}
+
+<style>
+	.image-zoom-figure {
+		margin: 0;
+	}
+	.image-zoom-caption {
+		margin-top: 0.75rem;
+		padding: 0 1rem;
+		font-size: 0.875rem;
+		font-style: italic;
+		color: rgb(107 114 128);
+		text-align: center;
+	}
+	:global(.dark) .image-zoom-caption {
+		color: rgb(209 213 219);
+	}
+	.image-zoom-overlay-caption {
+		position: fixed;
+		bottom: 40px;
+		left: 50%;
+		transform: translateX(-50%);
+		color: white;
+		font-size: 16px;
+		font-style: italic;
+		text-align: center;
+		max-width: 80%;
+		padding: 10px 20px;
+		background-color: rgba(0, 0, 0, 0.7);
+		border-radius: 8px;
+		z-index: 9999;
+		pointer-events: none;
+	}
+</style>

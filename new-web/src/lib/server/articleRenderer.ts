@@ -440,6 +440,21 @@ export async function renderArticle(
 		.use(rehypeStringify, { allowDangerousHtml: true });
 
 	const result = await processor.process(markdownContent);
+
+	// Render the cover-image caption through the SAME pipeline so markdown spans
+	// (links, emphasis, code) become HTML — body figcaptions get rendered because
+	// medium-parser drops them into the body markdown stream; this caption lives
+	// in YAML frontmatter and would otherwise reach the client as raw markdown.
+	if (article && article.postImageCaption) {
+		const captionHtml = String(await processor.process(article.postImageCaption));
+		// Strip the wrapping <p>…</p> remark-rehype adds; <figcaption> is an
+		// inline-content context, so a block paragraph is wrong here.
+		article.postImageCaption = captionHtml
+			.trim()
+			.replace(/^<p>([\s\S]*)<\/p>$/, "$1")
+			.trim();
+	}
+
 	return {
 		html: String(result),
 		markdown: markdownContent,

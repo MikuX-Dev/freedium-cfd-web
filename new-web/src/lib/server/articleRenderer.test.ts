@@ -34,6 +34,26 @@ describe("renderArticle (web mode)", () => {
         expect(markdown).not.toMatch(/^---/);
         expect(markdown).toMatch(/# Section One/);
     });
+
+    it("renders postImageCaption markdown to inline HTML (no wrapping <p>)", async () => {
+        const { article } = await renderArticle("ignored-slug");
+        expect(article).not.toBeNull();
+        const caption = article!.postImageCaption!;
+        // Markdown link converted to <a> with link text preserved
+        expect(caption).toMatch(/<a [^>]*href="https:\/\/unsplash\.com\/@cdr6934"[^>]*>Chris Ried/);
+        // Plain literal markdown brackets are gone
+        expect(caption).not.toMatch(/\[Chris Ried\]/);
+        // No outer <p> wrapper (figcaption is inline-only context)
+        expect(caption).not.toMatch(/^<p>/);
+        // External link icon was injected (web mode)
+        expect(caption).toMatch(/<svg[^>]*aria-hidden="true"/);
+    });
+
+    it("strips the external-link icon from caption in print mode", async () => {
+        const { article } = await renderArticle("ignored-slug", { mode: "print" });
+        expect(article!.postImageCaption).not.toMatch(/<svg/);
+        expect(article!.postImageCaption).toMatch(/href="https:\/\/unsplash\.com\/@cdr6934"/);
+    });
 });
 
 describe("renderArticle (print mode)", () => {

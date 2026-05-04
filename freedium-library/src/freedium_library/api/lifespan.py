@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from loguru import logger
 
 from freedium_library.api.container import APIContainer
+from freedium_library.api.error_log import register_error_log_sink
 from freedium_library.api.handlers import articles, download, render
 from freedium_library.services.medium import MediumService
 from freedium_library.services.medium.container import MediumContainer
@@ -43,6 +44,7 @@ async def _warmup_recent_feed(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    register_error_log_sink()
     app.state.container = api_container
     app.state.medium_container = medium_container
     app.state.recent_posts_container = recent_posts_container

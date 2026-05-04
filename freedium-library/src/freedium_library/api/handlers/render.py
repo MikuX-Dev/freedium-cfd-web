@@ -5,6 +5,8 @@ from fastapi.responses import PlainTextResponse
 from loguru import logger
 from pydantic import BaseModel
 
+from freedium_library.api.error_log import log_errored_link
+from freedium_library.api.metrics import ARTICLE_RENDER, track_render
 from freedium_library.services.medium import MediumService
 from freedium_library.services.medium.container import MediumContainer
 from freedium_library.services.medium.exceptions import InvalidMediumServicePathError
@@ -69,21 +71,24 @@ async def render_medium_post(
     Returns:
         Rendered Markdown content
     """
-    try:
-        # Use the *_and_metadata variants so we capture PostMetadata in the same
-        # GraphQL fetch — no extra round-trip just for the recent-posts feed.
-        if include_frontmatter:
-            content, metadata = (
-                await medium_service.arender_with_frontmatter_and_metadata(post_id)
-            )
-        else:
-            content, metadata = await medium_service.arender_with_metadata(post_id)
+    with track_render(ARTICLE_RENDER) as ctx:
+        try:
+            # Use the *_and_metadata variants so we capture PostMetadata in the same
+            # GraphQL fetch — no extra round-trip just for the recent-posts feed.
+            if include_frontmatter:
+                content, metadata = (
+                    await medium_service.arender_with_frontmatter_and_metadata(post_id)
+                )
+            else:
+                content, metadata = await medium_service.arender_with_metadata(post_id)
 
-        await _record_recent(request, metadata)
-        return PlainTextResponse(content=content, media_type="text/markdown")
+            await _record_recent(request, metadata)
+            return PlainTextResponse(content=content, media_type="text/markdown")
 
-    except InvalidMediumServicePathError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        except InvalidMediumServicePathError as e:
+            ctx.set_outcome("parser_failure")
+            log_errored_link(post_id, "parser_failure", None, str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @beartype
@@ -105,41 +110,48 @@ async def render_universal(
         HTTPException 404: If no service can handle the content
         HTTPException 500: If rendering fails
     """
-    try:
-        # Get resolver from app state
-        resolver: ServiceResolver = http_request.app.state.service_resolver
+    with track_render(ARTICLE_RENDER) as ctx:
+        try:
+            # Get resolver from app state
+            resolver: ServiceResolver = http_request.app.state.service_resolver
 
-        # Resolve the content to appropriate service
-        service_name, service = await resolver.resolve(request.content)
+            # Resolve the content to appropriate service
+            service_name, service = await resolver.resolve(request.content)
 
-        # Render using the resolved service. For Medium, use the *_and_metadata
-        # variants so we can populate the recent-posts feed in the same GraphQL
-        # fetch — no extra round-trip just for feed data.
-        if service_name == "medium" and isinstance(service, MediumService):
-            if request.frontmatter:
-                markdown, metadata = (
-                    await service.arender_with_frontmatter_and_metadata(request.content)
-                )
+            # Render using the resolved service. For Medium, use the *_and_metadata
+            # variants so we can populate the recent-posts feed in the same GraphQL
+            # fetch — no extra round-trip just for feed data.
+            if service_name == "medium" and isinstance(service, MediumService):
+                if request.frontmatter:
+                    markdown, metadata = (
+                        await service.arender_with_frontmatter_and_metadata(request.content)
+                    )
+                else:
+                    markdown, metadata = await service.arender_with_metadata(request.content)
+                await _record_recent(http_request, metadata)
             else:
-                markdown, metadata = await service.arender_with_metadata(request.content)
-            await _record_recent(http_request, metadata)
-        else:
-            if request.frontmatter:
-                markdown = await service.arender_with_frontmatter(request.content)
-            else:
-                markdown = await service.arender(request.content)
+                if request.frontmatter:
+                    markdown = await service.arender_with_frontmatter(request.content)
+                else:
+                    markdown = await service.arender(request.content)
 
-        return RenderResponse(markdown=markdown, service=service_name)
+            return RenderResponse(markdown=markdown, service=service_name)
 
-    except ServiceResolutionError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except InvalidMediumServicePathError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error rendering content: {str(e)}",
-        ) from e
+        except ServiceResolutionError as e:
+            ctx.set_outcome("parser_failure")
+            log_errored_link(request.content, "parser_failure", None, str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        except InvalidMediumServicePathError as e:
+            ctx.set_outcome("parser_failure")
+            log_errored_link(request.content, "parser_failure", None, str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        except Exception as e:
+            ctx.set_outcome("network_error")
+            log_errored_link(request.content, "network_error", None, str(e))
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error rendering content: {str(e)}",
+            ) from e
 
 
 def register_render_router(router: APIRouter) -> None:

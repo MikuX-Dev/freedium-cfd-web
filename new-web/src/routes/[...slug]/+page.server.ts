@@ -1,4 +1,5 @@
 import { renderArticle } from "$lib/server/articleRenderer";
+import { recordArticleFetch } from "$lib/server/metrics";
 import type { PageServerLoad } from "./$types";
 import type { ArticleErrorCode } from "$lib/types";
 
@@ -12,6 +13,7 @@ const ErrorCodes: Record<ArticleErrorCode, ArticleErrorCode> = {
 export const load: PageServerLoad = async ({ params }) => {
 	try {
 		const { html, markdown, article } = await renderArticle(params.slug);
+		recordArticleFetch("success");
 		return {
 			slug: params.slug,
 			loading: false,
@@ -23,6 +25,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	} catch (err) {
 		const message = (err as Error)?.message ?? "";
 		if (message === "ARTICLE_NOT_FOUND") {
+			recordArticleFetch("not_found");
 			return {
 				slug: params.slug,
 				loading: false,
@@ -37,6 +40,9 @@ export const load: PageServerLoad = async ({ params }) => {
 			};
 		}
 		console.error("Failed to render article:", err);
+		recordArticleFetch(
+			message.startsWith("UPSTREAM_") ? "upstream_error" : "network_fail",
+		);
 		return {
 			slug: params.slug,
 			loading: false,

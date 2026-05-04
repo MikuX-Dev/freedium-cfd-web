@@ -1,6 +1,6 @@
 import { mdsvex, escapeSvelte } from "mdsvex";
 import { createHighlighter } from "shiki";
-import adapter from "@sveltejs/adapter-auto";
+import adapter from "@sveltejs/adapter-node";
 import { toHtml } from "hast-util-to-html";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { h, s } from "hastscript";

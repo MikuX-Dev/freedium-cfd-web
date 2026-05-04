@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from freedium_library.api import metrics as _metrics  # noqa: F401  # registers Prom metrics
 from freedium_library.api.container import APIContainer
 from freedium_library.api.error import register_error_handler
 from freedium_library.api.handlers import register_router

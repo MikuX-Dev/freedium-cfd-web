@@ -1,0 +1,103 @@
+"""Custom domain metrics for Freedium.
+
+The HTTP-level metrics (http_requests_total etc.) come from
+prometheus-fastapi-instrumentator. This module owns *domain* metrics:
+article rendering, PDF rendering, and errored-link counts.
+
+Each metric name uses the `freedium_` prefix to namespace it apart from
+the framework-emitted metrics.
+"""
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+from dataclasses import dataclass
+from time import perf_counter
+from typing import Iterator
+
+from prometheus_client import Counter, Histogram
+
+
+@dataclass(frozen=True)
+class _MetricPair:
+    counter: Counter
+    histogram: Histogram
+
+
+ARTICLE_RENDER = _MetricPair(
+    counter=Counter(
+        "freedium_article_render_total",
+        "Article render attempts, labelled by outcome.",
+        labelnames=("outcome",),
+    ),
+    histogram=Histogram(
+        "freedium_article_render_duration_seconds",
+        "Article render latency in seconds.",
+    ),
+)
+
+PDF_RENDER = _MetricPair(
+    counter=Counter(
+        "freedium_pdf_render_total",
+        "PDF render attempts, labelled by outcome.",
+        labelnames=("outcome",),
+    ),
+    histogram=Histogram(
+        "freedium_pdf_render_duration_seconds",
+        "PDF render latency in seconds.",
+    ),
+)
+
+ERRORED_LINKS = Counter(
+    "freedium_errored_links_total",
+    "Article URLs that failed to render or fetch.",
+    labelnames=("kind", "host"),
+)
+
+
+class _RenderContext:
+    """Mutable handle yielded by track_render() so callers can set the
+    outcome label explicitly (e.g., distinguishing parser_failure from
+    upstream_5xx). If no outcome is set, defaults to 'success' on clean
+    exit; on exception, the caller-set outcome (or 'unknown') is used."""
+
+    def __init__(self) -> None:
+        self._outcome: str | None = None
+
+    def set_outcome(self, outcome: str) -> None:
+        self._outcome = outcome
+
+    @property
+    def outcome(self) -> str | None:
+        return self._outcome
+
+
+@contextmanager
+def track_render(metric: _MetricPair) -> Iterator[_RenderContext]:
+    """Time a render block and record the outcome counter.
+
+    Usage:
+        with track_render(ARTICLE_RENDER) as ctx:
+            try:
+                do_work()
+            except ParserError:
+                ctx.set_outcome("parser_failure")
+                raise
+
+    On clean exit with no outcome set, records 'success'. On exception
+    with an outcome already set, records that outcome. Always records
+    the histogram observation regardless of outcome.
+    """
+    ctx = _RenderContext()
+    start = perf_counter()
+    try:
+        yield ctx
+    except BaseException:
+        outcome = ctx.outcome or "unknown"
+        metric.counter.labels(outcome=outcome).inc()
+        metric.histogram.observe(perf_counter() - start)
+        raise
+    else:
+        outcome = ctx.outcome or "success"
+        metric.counter.labels(outcome=outcome).inc()
+        metric.histogram.observe(perf_counter() - start)

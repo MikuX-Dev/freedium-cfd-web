@@ -49,7 +49,13 @@ def test_unknown_service_returns_404_and_records_errored_link(
     assert res.status_code == 404
 
     metrics = client.get("/metrics").text
-    assert 'freedium_errored_links_total{' in metrics
+    # Tightened: assert THIS test's POST registered, not just that some
+    # errored-link sample exists in the registry (which warmup or other
+    # tests could also produce).
+    assert (
+        'freedium_errored_links_total{host="example-not-a-known-service.test",kind="parser_failure"}'
+        in metrics
+    )
 
     # Flush loguru's enqueue=True background thread before reading the file
     # so the JSONL reflects all records emitted up to this point.

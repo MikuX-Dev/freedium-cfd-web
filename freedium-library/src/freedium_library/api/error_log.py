@@ -19,6 +19,8 @@ from freedium_library.api.metrics import ERRORED_LINKS
 
 _ERROR_TRUNCATE_AT = 500
 
+_SINK_REGISTERED = False
+
 
 def _normalize_host(url: str) -> str:
     """Return a low-cardinality host label for the given URL.
@@ -42,10 +44,13 @@ def _normalize_host(url: str) -> str:
 def register_error_log_sink() -> None:
     """Add a loguru sink that emits one JSON line per errored link.
 
-    Idempotent enough for app startup: callers should `logger.remove()`
-    only sinks they explicitly own. Reads ERROR_LOG_PATH from env,
-    defaulting to /var/log/freedium/errored-links.jsonl.
+    Idempotent — calling it more than once in the same process is a
+    no-op. Reads ERROR_LOG_PATH from env, defaulting to
+    /var/log/freedium/errored-links.jsonl.
     """
+    global _SINK_REGISTERED
+    if _SINK_REGISTERED:
+        return
     path = os.environ.get("ERROR_LOG_PATH", "/var/log/freedium/errored-links.jsonl")
     logger.add(
         path,
@@ -57,6 +62,7 @@ def register_error_log_sink() -> None:
         compression="gz",
         enqueue=True,
     )
+    _SINK_REGISTERED = True
 
 
 def log_errored_link(

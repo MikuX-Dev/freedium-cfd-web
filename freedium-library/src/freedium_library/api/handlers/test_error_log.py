@@ -1,5 +1,6 @@
 """Tests for the errored-link JSONL writer."""
 import json
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -7,16 +8,22 @@ from loguru import logger
 
 
 @pytest.fixture
-def jsonl_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def jsonl_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     target = tmp_path / "errored-links.jsonl"
     monkeypatch.setenv("ERROR_LOG_PATH", str(target))
 
-    # Reset loguru, then re-register the sink against the patched env var.
+    # Reset loguru AND the registration guard so the sink can be re-bound
+    # to the patched env var on each test. Production lifespan registers
+    # the sink exactly once per process; the guard prevents duplicate
+    # registration during uvicorn --reload or in test harnesses that
+    # spin up multiple TestClient instances within one process.
     logger.remove()
-    from freedium_library.api.error_log import register_error_log_sink
-    register_error_log_sink()
+    import freedium_library.api.error_log as error_log
+    error_log._SINK_REGISTERED = False
+    error_log.register_error_log_sink()
     yield target
     logger.remove()
+    error_log._SINK_REGISTERED = False
 
 
 def _read(path: Path) -> list[dict]:

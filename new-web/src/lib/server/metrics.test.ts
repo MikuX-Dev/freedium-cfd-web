@@ -36,9 +36,11 @@ describe("server metrics registry", () => {
 		recordArticleFetch("success");
 		recordArticleFetch("upstream_error");
 		recordArticleFetch("network_fail");
+		recordArticleFetch("not_found");
 		const out = await registry.metrics();
 		expect(out).toMatch(/freedium_web_article_fetch_total\{outcome="success"\} 1/);
 		expect(out).toMatch(/freedium_web_article_fetch_total\{outcome="upstream_error"\} 1/);
 		expect(out).toMatch(/freedium_web_article_fetch_total\{outcome="network_fail"\} 1/);
+		expect(out).toMatch(/freedium_web_article_fetch_total\{outcome="not_found"\} 1/);
 	});
 });

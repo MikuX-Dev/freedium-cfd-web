@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from loguru import logger
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from freedium_library.api.container import APIContainer
 from freedium_library.api.error import register_error_handler
@@ -54,6 +55,11 @@ def create_application() -> FastAPI:
     register_middlewares(app)
 
     app.openapi = lambda: custom_openapi(app)
+
+    Instrumentator(
+        excluded_handlers=["/metrics", "/healthz"],
+        should_group_status_codes=False,
+    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
     return app
 
 

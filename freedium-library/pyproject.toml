@@ -32,6 +32,7 @@ license = {text = "MIT"}
 api = [
     "slowapi>=0.1.9",
     "fastapi[standard]>=0.115.12",
+    "prometheus-fastapi-instrumentator>=7.0.0",
 ]
 [tool.pdm]
 distribution = false

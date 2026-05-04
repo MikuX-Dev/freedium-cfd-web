@@ -18,20 +18,25 @@ export const handle: Handle = async ({ event, resolve }) => {
 		const body = await registry.metrics();
 		return new Response(body, {
 			status: 200,
-			headers: { "content-type": "text/plain; version=0.0.4; charset=utf-8" },
+			headers: {
+				"content-type": "text/plain; version=0.0.4; charset=utf-8",
+				"cache-control": "no-store",
+			},
 		});
 	}
 
 	const start = performance.now();
-	const response = await resolve(event);
-	const durationSec = (performance.now() - start) / 1000;
-
-	recordHttp({
-		method: event.request.method,
-		route: event.route.id ?? "unknown",
-		status: response.status,
-		duration: durationSec,
-	});
-
-	return response;
+	let status = 500;
+	try {
+		const response = await resolve(event);
+		status = response.status;
+		return response;
+	} finally {
+		recordHttp({
+			method: event.request.method,
+			route: event.route.id ?? "unknown",
+			status,
+			duration: (performance.now() - start) / 1000,
+		});
+	}
 };

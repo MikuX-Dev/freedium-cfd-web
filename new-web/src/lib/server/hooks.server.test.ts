@@ -28,6 +28,7 @@ describe("hooks.server.ts handle()", () => {
 		const res = await handle({ event, resolve });
 		expect(res.status).toBe(200);
 		expect(res.headers.get("content-type")).toMatch(/text\/plain/);
+		expect(res.headers.get("cache-control")).toBe("no-store");
 		const body = await res.text();
 		expect(body).toMatch(/^# HELP/m);
 	});
@@ -52,5 +53,19 @@ describe("hooks.server.ts handle()", () => {
 		await handle({ event, resolve });
 		const out = await registry.metrics();
 		expect(out).toMatch(/route="unknown"/);
+	});
+
+	it("records status=500 when resolve() throws (and re-raises)", async () => {
+		const { handle } = await import("../../hooks.server");
+		const { registry } = await import("$lib/server/metrics");
+		const event = makeEvent({ pathname: "/some/article", routeId: "/[...slug]" });
+		const resolve = async () => {
+			throw new Error("boom");
+		};
+		await expect(handle({ event, resolve })).rejects.toThrow("boom");
+		const out = await registry.metrics();
+		expect(out).toMatch(
+			/freedium_web_http_requests_total\{method="GET",route="\/\[\.\.\.slug\]",status="500"\} 1/,
+		);
 	});
 });

@@ -13,6 +13,8 @@ from fastapi.responses import Response
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from freedium_library.api.error_log import log_errored_link
+from freedium_library.api.metrics import PDF_RENDER, track_render
 from freedium_library.services.pdf.image_inliner import inline_images
 from freedium_library.services.pdf.renderer import render_pdf
 
@@ -27,6 +29,13 @@ class PdfRequest(BaseModel):
         max_length=255,
         pattern=r'^[^\r\n"\\/]+$',
         description="Filename for Content-Disposition (no path).",
+    )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Original article URL. Used only for error logging "
+            "(errored-link JSONL); not validated."
+        ),
     )
 
 
@@ -51,29 +60,37 @@ def register_pdf_router(router: APIRouter, secret: str) -> None:
         req: PdfRequest,
         _: None = Depends(require_secret),
     ) -> Response:
-        try:
-            inlined_html = await inline_images(req.html)
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.warning(f"inline_images failed: {exc!r}")
-            raise HTTPException(status_code=400, detail="HTML parse failed") from exc
+        url = req.url or "(unknown)"
+        with track_render(PDF_RENDER) as ctx:
+            try:
+                inlined_html = await inline_images(req.html)
+            except HTTPException:
+                ctx.set_outcome("pdf_failure")
+                raise
+            except Exception as exc:
+                ctx.set_outcome("pdf_failure")
+                logger.warning(f"inline_images failed: {exc!r}")
+                log_errored_link(url, "pdf_failure", None, repr(exc))
+                raise HTTPException(status_code=400, detail="HTML parse failed") from exc
 
-        try:
-            pdf_bytes = render_pdf(inlined_html)
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.exception("WeasyPrint render failed")
-            raise HTTPException(status_code=502, detail="PDF render failed") from exc
+            try:
+                pdf_bytes = render_pdf(inlined_html)
+            except HTTPException:
+                ctx.set_outcome("pdf_failure")
+                raise
+            except Exception as exc:
+                ctx.set_outcome("pdf_failure")
+                logger.exception("WeasyPrint render failed")
+                log_errored_link(url, "pdf_failure", None, repr(exc))
+                raise HTTPException(status_code=502, detail="PDF render failed") from exc
 
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'attachment; filename="{req.filename}"',
-            },
-        )
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{req.filename}"',
+                },
+            )
 
     pdf_router.add_api_route(
         "/pdf",

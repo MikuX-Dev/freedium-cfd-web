@@ -24,7 +24,7 @@ export const generatePdf = command(v.string(), async (slug) => {
 			"content-type": "application/json",
 			"x-internal-secret": PDF_SERVICE_SECRET,
 		},
-		body: JSON.stringify({ html: printHtml, filename }),
+		body: JSON.stringify({ html: printHtml, filename, url: slug }),
 	});
 	if (!res.ok) {
 		throw new Error(`PDF service returned ${res.status}`);

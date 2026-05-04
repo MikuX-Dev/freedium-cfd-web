@@ -95,3 +95,48 @@ def test_rejects_filename_with_path_separator():
         headers={"X-Internal-Secret": "s"},
     )
     assert res.status_code == 422
+
+
+def test_pdf_failure_increments_counter_and_logs(monkeypatch, tmp_path):
+    """A render that raises must bump pdf_render_total{outcome='pdf_failure'}
+    and produce a JSONL line tagged kind=pdf_failure."""
+    import json
+    from loguru import logger
+    from freedium_library.api.error_log import register_error_log_sink
+
+    log_path = tmp_path / "errored-links.jsonl"
+    monkeypatch.setenv("ERROR_LOG_PATH", str(log_path))
+    logger.remove()
+
+    # Same dance as test_error_log.py + test_render_metrics_integration.py:
+    # reset the idempotency guard so the sink can re-bind to this tmp path.
+    import freedium_library.api.error_log as error_log
+    error_log._SINK_REGISTERED = False
+    register_error_log_sink()
+
+    # Force render_pdf to raise so we exercise the error path
+    def boom(_html):
+        raise RuntimeError("font cache exploded")
+    monkeypatch.setattr(
+        "freedium_library.api.handlers.pdf.render_pdf", boom
+    )
+
+    client = _make_app(secret="real-secret")
+    res = client.post(
+        "/internal/pdf",
+        json={"html": "<h1>hello</h1>", "filename": "x.pdf",
+              "url": "https://medium.com/@u/article-x"},
+        headers={"X-Internal-Secret": "real-secret"},
+    )
+    assert res.status_code == 502
+
+    # Counter is exposed on /metrics — but the PDF test app mounts only
+    # the PDF router, so /metrics isn't on this client. Read the JSONL
+    # log instead, which is the durable surface anyway.
+    logger.complete()  # flush enqueue=True background thread before reading
+    rows = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert any(r["record"]["extra"]["kind"] == "pdf_failure" for r in rows)
+    assert any(
+        r["record"]["extra"]["url"] == "https://medium.com/@u/article-x"
+        for r in rows
+    )

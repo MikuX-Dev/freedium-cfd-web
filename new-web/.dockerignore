@@ -1,0 +1,10 @@
+node_modules
+build
+.svelte-kit
+.git
+.env
+.env.*
+*.log
+freedium_handoff
+caption-fixed.png
+docs

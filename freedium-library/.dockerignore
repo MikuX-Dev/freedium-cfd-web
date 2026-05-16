@@ -1,0 +1,11 @@
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+.mypy_cache
+node_modules
+build
+dist
+.git
+test.log

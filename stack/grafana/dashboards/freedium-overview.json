@@ -38,7 +38,7 @@
       "id": 1, "type": "stat", "title": "Total requests / min",
       "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(rate(http_requests_total[1m]))*60", "refId": "A" }],
+      "targets": [{ "expr": "sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\"}[1m]))*60", "refId": "A" }],
       "fieldConfig": { "defaults": { "unit": "short" } }
     },
     {
@@ -52,7 +52,7 @@
       "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [{
-        "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
+        "expr": "sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\",status=~\"5..\"}[5m])) / sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\"}[5m]))",
         "refId": "A"
       }],
       "fieldConfig": {
@@ -79,9 +79,9 @@
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "p50", "refId": "A" },
-        { "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "p95", "refId": "B" },
-        { "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "p99", "refId": "C" }
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate({__name__=~\"http_request_duration_seconds_bucket|freedium_web_http_request_duration_seconds_bucket\"}[5m])))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate({__name__=~\"http_request_duration_seconds_bucket|freedium_web_http_request_duration_seconds_bucket\"}[5m])))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate({__name__=~\"http_request_duration_seconds_bucket|freedium_web_http_request_duration_seconds_bucket\"}[5m])))", "legendFormat": "p99", "refId": "C" }
       ]
     },
     {

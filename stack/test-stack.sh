@@ -43,8 +43,12 @@ echo "$result" | grep -q '"resultType":"vector"' || { echo "bad Prom response"; 
 echo "$result" | grep -q '"value"' || { echo "no errored-links samples in Prometheus"; exit 1; }
 
 echo "==> Asserting Loki saw the URL..."
+# Loki rejects log-stream selectors on /query (instant) since v2.6 — those
+# must go to /query_range. Use a 1-hour window ending now.
+loki_end=$(date +%s)000000000
+loki_start=$((${loki_end%000000000} - 3600))000000000
 loki=$(docker compose exec -T loki wget -qO- \
-    "http://localhost:3100/loki/api/v1/query?query=%7Bjob%3D%22freedium%22%2Csource%3D%22errored_links%22%7D")
+    "http://localhost:3100/loki/api/v1/query_range?query=%7Bjob%3D%22freedium%22%2Csource%3D%22errored_links%22%7D&start=${loki_start}&end=${loki_end}")
 echo "$loki" | grep -q "example-not-a-known-service" \
     || { echo "URL did not reach Loki"; echo "$loki" | head -c 500; exit 1; }
 

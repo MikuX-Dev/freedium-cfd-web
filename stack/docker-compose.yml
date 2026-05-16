@@ -22,6 +22,7 @@ services:
     container_name: freedium-web
     environment:
       - PUBLIC_API_BASE_URL=http://backend:7080
+      - PUBLIC_API_URL=http://backend:7080/api
       - PDF_INTERNAL_SECRET=${PDF_INTERNAL_SECRET:-dev-secret-change-me}
       - PDF_SERVICE_URL=http://backend:7080
       - PDF_SERVICE_SECRET=${PDF_INTERNAL_SECRET:-dev-secret-change-me}

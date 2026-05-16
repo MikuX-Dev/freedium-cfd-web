@@ -20,6 +20,13 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000
 
+# wget is needed by the HEALTHCHECK below and by the stack smoke test
+# (test-stack.sh execs `wget` inside this container). bun:1.2-slim ships
+# with neither wget nor curl, so install the smallest option.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/*
+
 # Only the runtime artefacts. node_modules ships because adapter-node
 # expects them at runtime; for a smaller image consider `bun install --production`
 # in build stage and copying that instead.

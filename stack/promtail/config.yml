@@ -1,0 +1,40 @@
+server:
+  http_listen_port: 9080
+  log_level: warn
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: freedium-errored-links
+    static_configs:
+      - targets: ["localhost"]
+        labels:
+          job: freedium
+          source: errored_links
+          __path__: /var/log/freedium/errored-links.jsonl
+
+    pipeline_stages:
+      # The line is loguru's serialized JSON; the real payload lives under
+      # record.extra.
+      - json:
+          expressions:
+            extra: record.extra
+      - json:
+          source: extra
+          expressions:
+            kind: kind
+            host: host
+            status: status
+            url: url
+            error: error
+      - labels:
+          kind:
+          host:
+          status:
+      # Write a clean JSON line back so the URL stays queryable via |=
+      - output:
+          source: extra

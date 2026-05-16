@@ -9,3 +9,9 @@ build
 dist
 .git
 test.log
+new-web/
+freedium_handoff/
+**/tests/__pycache__/
+*.png
+*.jpg
+.worktrees/

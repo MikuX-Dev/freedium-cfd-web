@@ -38,6 +38,9 @@ api = [
 migrate = [
     "psycopg2-binary>=2.9.9",
 ]
+bench = [
+    "maturin>=1.7,<2.0",
+]
 [tool.pdm]
 distribution = false
 

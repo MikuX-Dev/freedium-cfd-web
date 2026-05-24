@@ -25,6 +25,7 @@ Open http://localhost:3001 (default password: whatever you set in
 | loki        | 3100          | —                    |
 | promtail    | 9080          | —                    |
 | grafana     | 3000          | `${GRAFANA_PORT:-3001}` |
+| mongo       | 27017         | —                    |
 
 Only `web` and `grafana` are reachable from the host.
 
@@ -41,6 +42,21 @@ To tail them directly:
 ```bash
 docker compose exec backend tail -f /var/log/freedium/errored-links.jsonl
 ```
+
+## Render cache
+
+The backend caches Medium GraphQL responses in MongoDB (`mongo` service,
+collection `freedium_cache.post_cache`). Values are zstd-compressed.
+Set `CACHE_ENABLED=false` in `.env` to bypass the cache and hit Medium on
+every request — useful for debugging.
+
+Cache hit/miss rate is exposed at `/metrics` via
+`freedium_cache_hits_total` and `freedium_cache_misses_total`. The
+Grafana dashboard does not surface them yet — add a panel in a
+follow-up.
+
+To migrate data from a legacy PostgreSQL `cache` table, see
+`freedium-library/README.md`.
 
 ## Verifying the stack
 

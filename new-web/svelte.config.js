@@ -180,6 +180,9 @@ const config = {
 
 	kit: {
 		adapter: adapter(),
+		paths: {
+			relative: false
+		},
 		alias: {
 			'$lib': './src/lib',
 			'$lib/*': './src/lib/*',

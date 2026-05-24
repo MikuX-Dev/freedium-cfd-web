@@ -65,6 +65,16 @@ ERRORED_LINKS = Counter(
     labelnames=("kind", "host"),
 )
 
+CACHE_HITS = Counter(
+    "freedium_cache_hits_total",
+    "Post-cache lookups served from Mongo without hitting Medium.",
+)
+
+CACHE_MISSES = Counter(
+    "freedium_cache_misses_total",
+    "Post-cache lookups that fell through to Medium.",
+)
+
 
 class _RenderContext:
     """Mutable handle yielded by track_render() so callers can set the

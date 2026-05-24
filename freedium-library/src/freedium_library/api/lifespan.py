@@ -6,9 +6,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from loguru import logger
 
+from dependency_injector import providers
+
+from freedium_library.api.config import CacheConfig
 from freedium_library.api.container import APIContainer
 from freedium_library.api.error_log import register_error_log_sink
 from freedium_library.api.handlers import articles, download, render
+from freedium_library.services.cache.container import CacheContainer
 from freedium_library.services.medium import MediumService
 from freedium_library.services.medium.container import MediumContainer
 from freedium_library.services.recent_posts.container import RecentPostsContainer
@@ -17,8 +21,15 @@ from freedium_library.services.recent_posts.service import RecentPostsService
 from freedium_library.services.resolver import ServiceResolver
 
 api_container = APIContainer()
+cache_container = CacheContainer()
 medium_container = MediumContainer()
 recent_posts_container = RecentPostsContainer()
+
+_cache_settings = CacheConfig()
+if _cache_settings.CACHE_ENABLED:
+    medium_container.cache_backend.override(cache_container.backend)
+else:
+    medium_container.cache_backend.override(providers.Object(None))
 
 
 async def _warmup_recent_feed(
@@ -47,8 +58,21 @@ async def _warmup_recent_feed(
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     register_error_log_sink()
     app.state.container = api_container
+    app.state.cache_container = cache_container
     app.state.medium_container = medium_container
     app.state.recent_posts_container = recent_posts_container
+
+    if _cache_settings.CACHE_ENABLED:
+        try:
+            await cache_container.backend().ainit_db()
+            logger.info(
+                f"Post cache enabled: {_cache_settings.MONGO_URL} "
+                f"db={_cache_settings.MONGO_DB} coll={_cache_settings.MONGO_COLLECTION}"
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Cache init failed; render will proceed cache-less: {exc}")
+    else:
+        logger.info("Post cache disabled (CACHE_ENABLED=false)")
     recent_posts_service = recent_posts_container.service()
     app.state.recent_posts_service = recent_posts_service
 
@@ -88,3 +112,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Unwire on shutdown
     medium_container.unwire()
     recent_posts_container.unwire()
+
+    if _cache_settings.CACHE_ENABLED:
+        try:
+            await cache_container.backend().aclose()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Cache close failed: {exc}")

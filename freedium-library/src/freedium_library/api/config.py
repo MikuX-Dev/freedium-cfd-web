@@ -27,3 +27,19 @@ class APIConfig(BaseConfig):
         default="dev-pdf-secret-change-in-prod",
         description="Shared secret required on POST /internal/pdf via X-Internal-Secret header.",
     )
+
+
+class CacheConfig(BaseConfig):
+    """Mongo-backed post-cache settings.
+
+    The cache sits in front of Medium's GraphQL endpoint: on hit, we skip
+    the upstream call entirely. CACHE_ENABLED=false disables the path so
+    dev/CI environments without a Mongo instance can run cleanly.
+    """
+
+    model_config = BaseSettingsConfigDict(env_prefix="")
+
+    CACHE_ENABLED: bool = Field(default=True)
+    MONGO_URL: str = Field(default="mongodb://localhost:27017")
+    MONGO_DB: str = Field(default="freedium_cache")
+    MONGO_COLLECTION: str = Field(default="post_cache")

@@ -6,14 +6,17 @@ from typing import TYPE_CHECKING, Any
 from beartype import beartype
 from loguru import logger
 
+from freedium_library.api.metrics import CACHE_HITS, CACHE_MISSES
 from freedium_library.utils import JSON
 from freedium_library.utils.hash import HashLib
+from freedium_library.utils.json import json as _json
 from freedium_library.utils.time import get_unix_ms
 
 from .models import GraphQLPost
 
 if TYPE_CHECKING:
     from freedium_library.services.medium.config import MediumConfig
+    from freedium_library.utils.cache.db.mongo import AsyncMongoDBCacheBackend
     from freedium_library.utils.http import CurlRequest
 
 
@@ -63,16 +66,62 @@ class MediumApiService:
         self,
         request: CurlRequest,
         config: MediumConfig,
+        cache: "AsyncMongoDBCacheBackend | None" = None,
     ):
         self.request = request
         self.config = config
+        self.cache = cache
 
-    @beartype
     async def query_post_by_id(
         self, post_id: str
-    ) -> GraphQLPost | None:
+    ) -> GraphQLPost | dict | None:
+        """Post fetch with Mongo cache in front of Medium.
+
+        On hit, deserialize stored JSON and return without touching Medium.
+        On miss/disabled, hit Medium then write back (failures non-fatal).
+        Read/write failures fall through to Medium and never break callers.
+        """
         logger.debug("Using graphql implementation")
-        return await self.query_post_graphql(post_id)
+
+        if self.cache is not None:
+            try:
+                cached = await self.cache.apull(post_id)
+            except Exception as ex:  # noqa: BLE001 — cache read errors must not break render
+                logger.warning(f"Cache read failed for {post_id}: {ex}; falling through to Medium")
+                cached = None
+
+            if cached is not None:
+                try:
+                    envelope = _json.loads(cached.value)
+                    CACHE_HITS.inc()
+                    # Envelope distinguishes model dumps from raw dicts so we
+                    # can rehydrate accurately. Legacy/unknown payloads are
+                    # returned as-is.
+                    if isinstance(envelope, dict) and "_shape" in envelope:
+                        if envelope["_shape"] == "model":
+                            return GraphQLPost.model_validate(envelope["data"])
+                        return envelope["data"]
+                    return envelope
+                except Exception as ex:  # noqa: BLE001
+                    logger.warning(f"Cache deserialize failed for {post_id}: {ex}; falling through to Medium")
+
+        CACHE_MISSES.inc()
+        result = await self.query_post_graphql(post_id)
+
+        if self.cache is not None and result is not None:
+            try:
+                if isinstance(result, GraphQLPost):
+                    envelope = {"_shape": "model", "data": result.model_dump(mode="json")}
+                elif isinstance(result, dict):
+                    envelope = {"_shape": "dict", "data": result}
+                else:
+                    envelope = None
+                if envelope is not None:
+                    await self.cache.apush(post_id, envelope)
+            except Exception as ex:  # noqa: BLE001 — cache write errors must not break render
+                logger.warning(f"Cache write failed for {post_id}: {ex}")
+
+        return result
 
     @beartype
     async def query_post_graphql(

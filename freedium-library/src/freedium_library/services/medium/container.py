@@ -13,10 +13,17 @@ from .medium import MediumService
 class MediumContainer(containers.DeclarativeContainer):
     config = providers.Singleton(MediumConfig)
     request = providers.Singleton(CurlRequest)
+
+    # Injected from outside (CacheContainer.backend or None when CACHE_ENABLED=false).
+    # Default to None so unit tests that instantiate MediumContainer in isolation
+    # still work without a Mongo.
+    cache_backend = providers.Object(None)
+
     api_service = providers.Singleton(
         MediumApiService,
         request=request,
         config=config,
+        cache=cache_backend,
     )
     validator = providers.Singleton(
         MediumServicePathValidator,

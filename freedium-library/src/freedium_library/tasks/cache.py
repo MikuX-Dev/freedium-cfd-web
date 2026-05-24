@@ -53,6 +53,55 @@ async def write_graphql_cache(post_id: str, data: str) -> None:
 
 
 @broker.task
+async def embed_images_in_cache(url: str, markdown: str, service: str) -> None:
+    """Fetch all images from rendered markdown, convert to base64, overwrite L2 cache."""
+    import re
+    import asyncio
+    import base64
+    import json
+
+    try:
+        import httpx
+
+        img_pattern = re.compile(r'(https://miro\.medium\.com/[^\s")\]]+)')
+        urls = list(set(img_pattern.findall(markdown)))
+
+        if not urls:
+            return
+
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            async def fetch_one(img_url: str) -> tuple[str, str | None]:
+                try:
+                    resp = await client.get(img_url)
+                    if resp.status_code == 200:
+                        content_type = resp.headers.get("content-type", "image/jpeg")
+                        b64 = base64.b64encode(resp.content).decode("ascii")
+                        return img_url, f"data:{content_type};base64,{b64}"
+                    return img_url, None
+                except Exception:
+                    return img_url, None
+
+            results = await asyncio.gather(*[fetch_one(u) for u in urls])
+
+        enriched = markdown
+        replaced = 0
+        for original_url, data_uri in results:
+            if data_uri:
+                enriched = enriched.replace(original_url, data_uri)
+                replaced += 1
+
+        if replaced == 0:
+            return
+
+        backend = _get_rendered_backend()
+        await backend.apush(url, json.dumps({"markdown": enriched, "service": service}))
+        logger.info(f"embed_images_in_cache: embedded {replaced}/{len(urls)} images for {url[:60]}")
+
+    except Exception as exc:
+        logger.warning(f"embed_images_in_cache failed for {url[:60]}: {exc!r}")
+
+
+@broker.task
 async def warm_cache(url: str) -> None:
     """Pre-render a URL so first-time visitors get an L2 hit."""
     try:

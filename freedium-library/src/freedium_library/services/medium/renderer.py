@@ -398,7 +398,7 @@ class MediumMarkdownRenderer:
         self,
         post_data: GraphQLPost,
         api_service: MediumApiService,
-        use_base64_images: bool = True,
+        use_base64_images: bool = False,
     ) -> None:
         self._post_data = post_data
         self._output: list[str] = []

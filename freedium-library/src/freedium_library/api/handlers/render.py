@@ -160,9 +160,11 @@ async def render_universal(
 
             # Write to L2 rendered cache (async via TaskIQ)
             if rendered_cache is not None:
-                from freedium_library.tasks.cache import write_rendered_cache
+                from freedium_library.tasks.cache import write_rendered_cache, embed_images_in_cache
                 try:
                     await write_rendered_cache.kiq(request.content, markdown, service_name)
+                    # Background: fetch images, convert to base64, overwrite L2 cache
+                    await embed_images_in_cache.kiq(request.content, markdown, service_name)
                 except Exception:
                     pass  # broker down — fall through silently
 

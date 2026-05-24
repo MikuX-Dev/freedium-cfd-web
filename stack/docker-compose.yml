@@ -105,6 +105,24 @@ services:
       - freedium_obs_net
     restart: unless-stopped
 
+  scheduler:
+    build:
+      context: ..
+      dockerfile: freedium-library/Dockerfile
+    container_name: freedium-scheduler
+    command: ["taskiq", "scheduler", "freedium_library.tasks:scheduler"]
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - MONGO_URL=mongodb://mongo:27017
+      - MONGO_DB=${MONGO_DB:-freedium_cache}
+      - CACHE_ENABLED=${CACHE_ENABLED:-true}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - freedium_obs_net
+    restart: unless-stopped
+
   web:
     build:
       context: ../new-web

@@ -32,34 +32,6 @@ else:
     medium_container.cache_backend.override(providers.Object(None))
 
 
-async def _refresh_random_posts_loop() -> None:
-    """Refresh the random-posts cache every 2 minutes."""
-    import json
-
-    from redis.asyncio import Redis
-
-    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-
-    while True:
-        try:
-            r = Redis.from_url(redis_url, decode_responses=True)
-            try:
-                post_ids = await r.zrandmember("freedium:recent_posts", count=20)
-                if post_ids:
-                    post_ids = list(set(post_ids))
-                    raw_values = await r.hmget("freedium:recent_posts_data", *post_ids)
-                    posts_json = [v for v in raw_values if v]
-                    if posts_json:
-                        await r.setex("freedium:random_posts", 130, json.dumps(posts_json))
-                        logger.info(f"random_posts: refreshed {len(posts_json)} posts")
-            finally:
-                await r.aclose()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"random_posts refresh failed: {exc!r}")
-
-        await asyncio.sleep(120)
-
-
 async def _warmup_recent_feed(
     medium_service: MediumService,
     recent_posts_service: RecentPostsService,
@@ -136,19 +108,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             _warmup_recent_feed(medium_service, recent_posts_service, SEED_URLS)
         )
 
-    # Start the random-posts refresh loop (runs every 2 min, reads Redis only)
-    random_posts_task = asyncio.create_task(_refresh_random_posts_loop())
-
     yield
 
     # Cancel background tasks
-    for task in (warmup_task, random_posts_task):
-        if task is not None and not task.done():
-            task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):  # noqa: BLE001
-                pass
+    if warmup_task is not None and not warmup_task.done():
+        warmup_task.cancel()
+        try:
+            await warmup_task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
 
     # Unwire on shutdown
     medium_container.unwire()

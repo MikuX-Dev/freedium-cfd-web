@@ -337,6 +337,7 @@ export interface RenderResult {
 	html: string;
 	markdown: string;
 	article: ArticleMetadata | null;
+	cacheStatus: string;
 }
 
 export async function renderArticle(
@@ -459,5 +460,6 @@ export async function renderArticle(
 		html: String(result),
 		markdown: markdownContent,
 		article,
+		cacheStatus: renderResult.cache_status ?? "miss",
 	};
 }

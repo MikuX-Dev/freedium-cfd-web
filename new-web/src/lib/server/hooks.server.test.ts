@@ -55,6 +55,22 @@ describe("hooks.server.ts handle()", () => {
 		expect(out).toMatch(/route="unknown"/);
 	});
 
+	it("preserves X-Cache-Status and X-Render-Time headers from resolve()", async () => {
+		const { handle } = await import("../../hooks.server");
+		const event = makeEvent({ pathname: "/some-article", routeId: "/[...slug]" });
+		const mockResponse = new Response("ok", {
+			status: 200,
+			headers: {
+				"X-Cache-Status": "l2_hit_embedded",
+				"X-Render-Time": "42ms",
+			},
+		});
+		const resolve = async () => mockResponse;
+		const res = await handle({ event, resolve });
+		expect(res.headers.get("X-Cache-Status")).toBe("l2_hit_embedded");
+		expect(res.headers.get("X-Render-Time")).toBe("42ms");
+	});
+
 	it("records status=500 when resolve() throws (and re-raises)", async () => {
 		const { handle } = await import("../../hooks.server");
 		const { registry } = await import("$lib/server/metrics");

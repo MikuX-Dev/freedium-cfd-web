@@ -31,6 +31,7 @@ class RenderResponse(BaseModel):
 
     markdown: str
     service: str
+    cache_status: str = "miss"
 
 
 async def _record_recent(
@@ -125,9 +126,11 @@ async def render_universal(
             if cached is not None:
                 data = _json.loads(cached.value)
                 RENDERED_CACHE_HITS.inc()
+                has_embedded = "data:image" in data["markdown"]
                 return RenderResponse(
                     markdown=data["markdown"],
                     service=data["service"],
+                    cache_status=f"l2_hit_{'embedded' if has_embedded else 'cdn'}",
                 )
         except Exception:
             pass  # treat L2 read failure as a miss

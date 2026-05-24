@@ -10,9 +10,17 @@ const ErrorCodes: Record<ArticleErrorCode, ArticleErrorCode> = {
 	INTERNAL_ERROR: "INTERNAL_ERROR",
 };
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, setHeaders }) => {
 	try {
-		const { html, markdown, article } = await renderArticle(params.slug);
+		const start = performance.now();
+		const { html, markdown, article, cacheStatus } = await renderArticle(params.slug);
+		const renderTimeMs = Math.round(performance.now() - start);
+
+		setHeaders({
+			"X-Cache-Status": cacheStatus,
+			"X-Render-Time": `${renderTimeMs}ms`,
+		});
+
 		recordArticleFetch("success");
 		return {
 			slug: params.slug,

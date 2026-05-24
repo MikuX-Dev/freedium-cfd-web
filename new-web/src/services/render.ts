@@ -9,6 +9,7 @@ interface RenderRequest {
 interface RenderResponse {
 	markdown: string;
 	service: string;
+	cache_status?: string;
 }
 
 export async function render(content: string, frontmatter = false): Promise<RenderResponse> {

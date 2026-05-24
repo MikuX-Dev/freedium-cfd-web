@@ -11,23 +11,25 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open http://localhost:3001 (default password: whatever you set in
-`.env` as `GF_ADMIN_PASSWORD`). The provisioned dashboard is
-**Freedium / Freedium Overview**.
+Open:
+- **http://freedium.localhost** — the Freedium web frontend
+- **http://grafana.localhost** — Grafana (default: admin/admin or whatever `GF_ADMIN_PASSWORD` is)
+- **http://traefik.localhost** — Traefik dashboard (routing table, health)
+
+All traffic enters via Traefik on port 80.
 
 ## What runs where
 
-| Service     | Internal port | Host port            |
-|-------------|--------------:|---------------------:|
-| backend     | 7080          | —                    |
-| web         | 3000          | `${WEB_PORT:-3000}`  |
-| prometheus  | 9090          | —                    |
-| loki        | 3100          | —                    |
-| promtail    | 9080          | —                    |
-| grafana     | 3000          | `${GRAFANA_PORT:-3001}` |
-| mongo       | 27017         | —                    |
-
-Only `web` and `grafana` are reachable from the host.
+| Service     | Internal port | External route              |
+|-------------|:-------------:|:---------------------------:|
+| traefik     | 80, 8080      | port 80 (host), traefik.localhost |
+| web         | 3000          | freedium.localhost          |
+| backend     | 7080          | — (internal only)           |
+| mongo       | 27017         | — (internal only)           |
+| prometheus  | 9090          | — (internal only)           |
+| loki        | 3100          | — (internal only)           |
+| promtail    | 9080          | — (internal only)           |
+| grafana     | 3000          | grafana.localhost           |
 
 ## Errored-link logs
 

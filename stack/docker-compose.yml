@@ -42,6 +42,28 @@ services:
       start_period: 15s
       retries: 5
 
+  traefik:
+    image: traefik:v3.5
+    container_name: freedium-traefik
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.metrics.address=:8082"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=true"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entryPoint=metrics"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+    ports:
+      - "80:80"
+    volumes:
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - freedium_obs_net
+    restart: unless-stopped
+
   web:
     build:
       context: ../new-web
@@ -53,8 +75,6 @@ services:
       - PDF_INTERNAL_SECRET=${PDF_INTERNAL_SECRET:-dev-secret-change-me}
       - PDF_SERVICE_URL=http://backend:7080
       - PDF_SERVICE_SECRET=${PDF_INTERNAL_SECRET:-dev-secret-change-me}
-    ports:
-      - "${WEB_PORT:-3000}:3000"
     depends_on:
       backend:
         condition: service_healthy
@@ -108,8 +128,6 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
-    ports:
-      - "${GRAFANA_PORT:-3001}:3000"
     depends_on:
       - prometheus
       - loki

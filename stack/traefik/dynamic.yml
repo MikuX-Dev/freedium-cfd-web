@@ -1,0 +1,30 @@
+http:
+  routers:
+    web:
+      rule: "Host(`freedium.localhost`)"
+      entryPoints:
+        - web
+      service: web
+
+    grafana:
+      rule: "Host(`grafana.localhost`)"
+      entryPoints:
+        - web
+      service: grafana
+
+    dashboard:
+      rule: "Host(`traefik.localhost`)"
+      entryPoints:
+        - web
+      service: api@internal
+
+  services:
+    web:
+      loadBalancer:
+        servers:
+          - url: "http://web:3000"
+
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"

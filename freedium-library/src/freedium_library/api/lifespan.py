@@ -27,7 +27,7 @@ recent_posts_container = RecentPostsContainer()
 
 _cache_settings = CacheConfig()
 if _cache_settings.CACHE_ENABLED:
-    medium_container.cache_backend.override(cache_container.backend)
+    medium_container.cache_backend.override(cache_container.graphql_backend)
 else:
     medium_container.cache_backend.override(providers.Object(None))
 
@@ -64,15 +64,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     if _cache_settings.CACHE_ENABLED:
         try:
-            await cache_container.backend().ainit_db()
+            await cache_container.graphql_backend().ainit_db()
             logger.info(
                 f"Post cache enabled: {_cache_settings.MONGO_URL} "
                 f"db={_cache_settings.MONGO_DB} coll={_cache_settings.MONGO_COLLECTION}"
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Cache init failed; render will proceed cache-less: {exc}")
+        try:
+            rendered_cache = cache_container.rendered_backend()
+            await rendered_cache.ainit_db()
+            app.state.rendered_cache = rendered_cache
+            logger.info("Rendered-output cache (L2) enabled")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Rendered cache init failed: {exc}")
+            app.state.rendered_cache = None
     else:
         logger.info("Post cache disabled (CACHE_ENABLED=false)")
+        app.state.rendered_cache = None
     recent_posts_service = recent_posts_container.service()
     app.state.recent_posts_service = recent_posts_service
 
@@ -115,6 +124,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     if _cache_settings.CACHE_ENABLED:
         try:
-            await cache_container.backend().aclose()
+            await cache_container.graphql_backend().aclose()
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Cache close failed: {exc}")
+        if getattr(app.state, "rendered_cache", None):
+            try:
+                await app.state.rendered_cache.aclose()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Rendered cache close failed: {exc}")

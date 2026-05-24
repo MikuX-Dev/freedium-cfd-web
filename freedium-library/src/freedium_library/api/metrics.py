@@ -75,6 +75,16 @@ CACHE_MISSES = Counter(
     "Post-cache lookups that fell through to Medium.",
 )
 
+RENDERED_CACHE_HITS = Counter(
+    "freedium_rendered_cache_hits_total",
+    "Requests served from the rendered-output cache (skipping render entirely).",
+)
+
+RENDERED_CACHE_MISSES = Counter(
+    "freedium_rendered_cache_misses_total",
+    "Requests that missed the rendered-output cache and required a full render.",
+)
+
 
 class _RenderContext:
     """Mutable handle yielded by track_render() so callers can set the

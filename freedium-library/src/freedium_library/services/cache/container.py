@@ -13,9 +13,16 @@ from freedium_library.utils.cache.db.mongo import AsyncMongoDBCacheBackend
 class CacheContainer(containers.DeclarativeContainer):
     config = providers.Singleton(CacheConfig)
 
-    backend = providers.Singleton(
+    graphql_backend = providers.Singleton(
         AsyncMongoDBCacheBackend,
         connection_string=providers.Callable(lambda c: c.MONGO_URL, config),
         database=providers.Callable(lambda c: c.MONGO_DB, config),
         collection=providers.Callable(lambda c: c.MONGO_COLLECTION, config),
+    )
+
+    rendered_backend = providers.Singleton(
+        AsyncMongoDBCacheBackend,
+        connection_string=providers.Callable(lambda c: c.MONGO_URL, config),
+        database=providers.Callable(lambda c: c.MONGO_DB, config),
+        collection="rendered_cache",
     )

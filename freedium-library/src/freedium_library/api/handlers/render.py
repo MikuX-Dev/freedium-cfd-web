@@ -6,7 +6,12 @@ from loguru import logger
 from pydantic import BaseModel
 
 from freedium_library.api.error_log import log_errored_link
-from freedium_library.api.metrics import ARTICLE_RENDER, track_render
+from freedium_library.api.metrics import (
+    ARTICLE_RENDER,
+    RENDERED_CACHE_HITS,
+    RENDERED_CACHE_MISSES,
+    track_render,
+)
 from freedium_library.services.medium import MediumService
 from freedium_library.services.medium.container import MediumContainer
 from freedium_library.services.medium.exceptions import InvalidMediumServicePathError
@@ -110,6 +115,24 @@ async def render_universal(
         HTTPException 404: If no service can handle the content
         HTTPException 500: If rendering fails
     """
+    # --- L2: rendered-output cache ---
+    import json as _json
+
+    rendered_cache = getattr(http_request.app.state, "rendered_cache", None)
+    if rendered_cache is not None:
+        try:
+            cached = await rendered_cache.apull(request.content)
+            if cached is not None:
+                data = _json.loads(cached.value)
+                RENDERED_CACHE_HITS.inc()
+                return RenderResponse(
+                    markdown=data["markdown"],
+                    service=data["service"],
+                )
+        except Exception:
+            pass  # treat L2 read failure as a miss
+    RENDERED_CACHE_MISSES.inc()
+
     with track_render(ARTICLE_RENDER) as ctx:
         try:
             # Get resolver from app state
@@ -134,6 +157,16 @@ async def render_universal(
                     markdown = await service.arender_with_frontmatter(request.content)
                 else:
                     markdown = await service.arender(request.content)
+
+            # Write to L2 rendered cache
+            if rendered_cache is not None:
+                try:
+                    await rendered_cache.apush(
+                        request.content,
+                        _json.dumps({"markdown": markdown, "service": service_name}),
+                    )
+                except Exception:
+                    pass
 
             return RenderResponse(markdown=markdown, service=service_name)
 

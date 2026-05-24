@@ -158,15 +158,13 @@ async def render_universal(
                 else:
                     markdown = await service.arender(request.content)
 
-            # Write to L2 rendered cache
+            # Write to L2 rendered cache (async via TaskIQ)
             if rendered_cache is not None:
+                from freedium_library.tasks.cache import write_rendered_cache
                 try:
-                    await rendered_cache.apush(
-                        request.content,
-                        _json.dumps({"markdown": markdown, "service": service_name}),
-                    )
+                    await write_rendered_cache.kiq(request.content, markdown, service_name)
                 except Exception:
-                    pass
+                    pass  # broker down — fall through silently
 
             return RenderResponse(markdown=markdown, service=service_name)
 

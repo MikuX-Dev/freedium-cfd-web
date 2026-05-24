@@ -85,9 +85,14 @@ RUN useradd --system --no-create-home --shell /usr/sbin/nologin freedium \
     && mkdir -p /var/log/freedium \
     && chown freedium:freedium /var/log/freedium
 
+# Prometheus multiprocess directory (shared across uvicorn workers)
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+RUN mkdir -p /tmp/prometheus_multiproc && chown freedium:freedium /tmp/prometheus_multiproc
+
 # Copy installed Python packages + console scripts from builder
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
+COPY --from=builder /usr/local/bin/taskiq /usr/local/bin/taskiq
 
 USER freedium
 
@@ -96,4 +101,4 @@ EXPOSE 7080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:7080/healthz > /dev/null || exit 1
 
-CMD ["uvicorn", "freedium_library.api.app:app", "--host", "0.0.0.0", "--port", "7080", "--log-level", "warning"]
+CMD ["uvicorn", "freedium_library.api.app:app", "--host", "0.0.0.0", "--port", "7080", "--workers", "4", "--log-level", "warning"]

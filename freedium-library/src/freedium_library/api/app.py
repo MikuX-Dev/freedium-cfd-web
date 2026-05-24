@@ -1,6 +1,14 @@
+import os
+
 from fastapi import FastAPI
 from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
+
+# Multiprocess Prometheus support: each uvicorn worker writes to a shared
+# mmap'd directory. The /metrics endpoint aggregates all workers.
+_MULTIPROC_DIR = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
+if _MULTIPROC_DIR:
+    os.makedirs(_MULTIPROC_DIR, exist_ok=True)
 
 from freedium_library.api import metrics as _metrics  # noqa: F401  # registers Prom metrics
 from freedium_library.api.container import APIContainer
@@ -66,6 +74,18 @@ def create_application() -> FastAPI:
         excluded_handlers=["/metrics", "/healthz"],
         should_group_status_codes=False,
     ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+
+    if _MULTIPROC_DIR:
+        from prometheus_client import CollectorRegistry, generate_latest, multiprocess, CONTENT_TYPE_LATEST
+        from fastapi.responses import Response as FastAPIResponse
+
+        @app.get("/metrics", include_in_schema=False)
+        def _metrics_multiproc():
+            registry = CollectorRegistry()
+            multiprocess.MultiProcessCollector(registry)
+            data = generate_latest(registry)
+            return FastAPIResponse(content=data, media_type=CONTENT_TYPE_LATEST)
+
     return app
 
 

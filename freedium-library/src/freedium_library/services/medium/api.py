@@ -117,7 +117,13 @@ class MediumApiService:
                 else:
                     envelope = None
                 if envelope is not None:
-                    await self.cache.apush(post_id, envelope)
+                    from freedium_library.tasks.cache import write_graphql_cache
+                    serialized = _json.dumps(envelope)
+                    try:
+                        await write_graphql_cache.kiq(post_id, serialized if isinstance(serialized, str) else serialized.decode())
+                    except Exception:
+                        # Broker down — write synchronously as fallback
+                        await self.cache.apush(post_id, envelope)
             except Exception as ex:  # noqa: BLE001 — cache write errors must not break render
                 logger.warning(f"Cache write failed for {post_id}: {ex}")
 

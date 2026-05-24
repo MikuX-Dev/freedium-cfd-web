@@ -13,10 +13,14 @@ services:
       - MONGO_URL=mongodb://mongo:27017
       - MONGO_DB=${MONGO_DB:-freedium_cache}
       - MONGO_COLLECTION=${MONGO_COLLECTION:-post_cache}
+      - REDIS_URL=redis://redis:6379/0
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     volumes:
       - errored_logs:/var/log/freedium
     depends_on:
       mongo:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - freedium_obs_net
@@ -64,11 +68,49 @@ services:
       - freedium_obs_net
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: freedium-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks:
+      - freedium_obs_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build:
+      context: ..
+      dockerfile: freedium-library/Dockerfile
+    container_name: freedium-worker
+    command: ["taskiq", "worker", "freedium_library.tasks:broker"]
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - MONGO_URL=mongodb://mongo:27017
+      - MONGO_DB=${MONGO_DB:-freedium_cache}
+      - MONGO_COLLECTION=${MONGO_COLLECTION:-post_cache}
+      - CACHE_ENABLED=${CACHE_ENABLED:-true}
+      - ERROR_LOG_PATH=/var/log/freedium/errored-links.jsonl
+    volumes:
+      - errored_logs:/var/log/freedium
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    networks:
+      - freedium_obs_net
+    restart: unless-stopped
+
   web:
     build:
       context: ../new-web
       dockerfile: Dockerfile
-    container_name: freedium-web
+    deploy:
+      replicas: 3
     environment:
       - PUBLIC_API_BASE_URL=http://backend:7080
       - PUBLIC_API_URL=http://backend:7080/api

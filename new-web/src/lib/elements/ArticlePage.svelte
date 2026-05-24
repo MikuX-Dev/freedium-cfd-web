@@ -18,7 +18,6 @@
 	import { initializeImageZoom } from '$lib/imageZoom';
 	import { startIframeThemeSync } from '$lib/iframeTheme';
 	import { articleDownloadUrl } from '@/services';
-	import { generatePdf } from '$lib/article.remote';
 	import type { ArticlePageData } from '$lib/types';
 
 	interface Props {
@@ -50,8 +49,17 @@
 		if (!data.slug || pdfState === 'generating') return;
 		pdfState = 'generating';
 		try {
-			const { bytes, filename } = await generatePdf(data.slug);
-			const blob = new Blob([bytes], { type: 'application/pdf' });
+			const res = await fetch('/api/pdf', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ slug: data.slug }),
+			});
+			if (!res.ok) {
+				throw new Error(`PDF generation failed: ${res.status}`);
+			}
+			const blob = await res.blob();
+			const filename = res.headers.get('content-disposition')
+				?.match(/filename="([^"]+)"/)?.[1] || 'article.pdf';
 			const url = URL.createObjectURL(blob);
 			const a = Object.assign(document.createElement('a'), {
 				href: url,

@@ -3,10 +3,13 @@ import type { RequestHandler } from "./$types";
 import config from "@/config";
 
 export const GET: RequestHandler = async ({ url }) => {
-	const articleUrl = url.searchParams.get("url");
+	let articleUrl = url.searchParams.get("url");
 	if (!articleUrl) {
 		throw error(400, "Missing url parameter");
 	}
+	// SvelteKit's [...slug] route collapses // to / in path segments.
+	// Restore the protocol double-slash so the backend can match the URL.
+	articleUrl = articleUrl.replace(/^(https?):\/([^/])/, "$1://$2");
 
 	const backendUrl = `${config.API_URL}/articles/download?${new URLSearchParams({ url: articleUrl })}`;
 

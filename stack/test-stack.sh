@@ -34,7 +34,7 @@ BAD_URL="https://example-not-a-known-service.test/article"
 
 echo "==> Triggering a known-bad render via the web..."
 docker compose exec -T web wget -qO- "http://localhost:3000/${BAD_URL}" >/dev/null || true
-sleep 5  # give Promtail time to ship the line + Prometheus time to scrape
+sleep 20  # give Promtail time to ship the line + Prometheus time to scrape (15s interval)
 
 echo "==> Asserting Prometheus saw the counter..."
 result=$(docker compose exec -T prometheus wget -qO- \

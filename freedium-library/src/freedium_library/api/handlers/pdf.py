@@ -64,9 +64,6 @@ def register_pdf_router(router: APIRouter, secret: str) -> None:
         with track_render(PDF_RENDER) as ctx:
             try:
                 inlined_html = await inline_images(req.html)
-            except HTTPException:
-                ctx.set_outcome("pdf_failure")
-                raise
             except Exception as exc:
                 ctx.set_outcome("pdf_failure")
                 logger.warning(f"inline_images failed: {exc!r}")
@@ -75,9 +72,6 @@ def register_pdf_router(router: APIRouter, secret: str) -> None:
 
             try:
                 pdf_bytes = render_pdf(inlined_html)
-            except HTTPException:
-                ctx.set_outcome("pdf_failure")
-                raise
             except Exception as exc:
                 ctx.set_outcome("pdf_failure")
                 logger.exception("WeasyPrint render failed")

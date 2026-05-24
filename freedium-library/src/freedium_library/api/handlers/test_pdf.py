@@ -97,22 +97,10 @@ def test_rejects_filename_with_path_separator():
     assert res.status_code == 422
 
 
-def test_pdf_failure_increments_counter_and_logs(monkeypatch, tmp_path):
+def test_pdf_failure_increments_counter_and_logs(monkeypatch, errored_links_jsonl):
     """A render that raises must bump pdf_render_total{outcome='pdf_failure'}
     and produce a JSONL line tagged kind=pdf_failure."""
-    import json
-    from loguru import logger
-    from freedium_library.api.error_log import register_error_log_sink
-
-    log_path = tmp_path / "errored-links.jsonl"
-    monkeypatch.setenv("ERROR_LOG_PATH", str(log_path))
-    logger.remove()
-
-    # Same dance as test_error_log.py + test_render_metrics_integration.py:
-    # reset the idempotency guard so the sink can re-bind to this tmp path.
-    import freedium_library.api.error_log as error_log
-    error_log._SINK_REGISTERED = False
-    register_error_log_sink()
+    from freedium_library.api.handlers.conftest import read_errored_links
 
     # Force render_pdf to raise so we exercise the error path
     def boom(_html):
@@ -133,8 +121,7 @@ def test_pdf_failure_increments_counter_and_logs(monkeypatch, tmp_path):
     # Counter is exposed on /metrics — but the PDF test app mounts only
     # the PDF router, so /metrics isn't on this client. Read the JSONL
     # log instead, which is the durable surface anyway.
-    logger.complete()  # flush enqueue=True background thread before reading
-    rows = [json.loads(line) for line in log_path.read_text().splitlines()]
+    rows = read_errored_links(errored_links_jsonl)
     assert any(r["record"]["extra"]["kind"] == "pdf_failure" for r in rows)
     assert any(
         r["record"]["extra"]["url"] == "https://medium.com/@u/article-x"

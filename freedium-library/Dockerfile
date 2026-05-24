@@ -1,31 +1,33 @@
-# Build the FastAPI service from a build context that includes
-# freedium-library + its sibling Python packages. Used by stack/docker-compose.yml
-# with `build.context: ..` so the COPYs below resolve.
+# Multi-stage build: builder has compilers, runtime is slim.
+#
+# Stage 1: install dependencies (build-essential needed for Cython
+# extension in rl_string_helper, libffi-dev for cryptography wheels).
+# Stage 2: copy the installed site-packages into a slim runtime image
+# with only WeasyPrint's *runtime* shared libraries.
 
-FROM python:3.12-slim AS base
+FROM python:3.12-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# WeasyPrint runtime deps + curl for healthcheck
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
+        libffi-dev \
+        libjpeg-dev \
         libpango-1.0-0 \
         libpangoft2-1.0-0 \
         libharfbuzz0b \
         libcairo2 \
-        libffi-dev \
-        libjpeg-dev \
         libgdk-pixbuf-2.0-0 \
         shared-mime-info \
-        curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install sibling deps first (changed less often than freedium-library itself)
+# Install sibling deps first (cache-friendly: they change less often)
 COPY rl_string_helper /deps/rl_string_helper
 RUN pip install /deps/rl_string_helper
 
@@ -39,14 +41,40 @@ RUN pip install /deps/medium-parser
 COPY freedium-library /app/freedium-library
 RUN pip install "/app/freedium-library[api]"
 
-# Errored-link log directory; mounted volume will overlay this in compose
-RUN mkdir -p /var/log/freedium
+# ---------- runtime stage ----------
+FROM python:3.12-slim AS runtime
 
-ENV ERROR_LOG_PATH=/var/log/freedium/errored-links.jsonl
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    ERROR_LOG_PATH=/var/log/freedium/errored-links.jsonl
+
+# Runtime-only libraries: WeasyPrint shared libs + curl for healthcheck.
+# build-essential and *-dev packages are deliberately omitted from this stage.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libharfbuzz0b \
+        libcairo2 \
+        libgdk-pixbuf-2.0-0 \
+        shared-mime-info \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root runtime user
+RUN useradd --system --no-create-home --shell /usr/sbin/nologin freedium \
+    && mkdir -p /var/log/freedium \
+    && chown freedium:freedium /var/log/freedium
+
+# Copy installed Python packages + console scripts from builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
+
+USER freedium
 
 EXPOSE 7080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:7080/metrics > /dev/null || exit 1
+    CMD curl -fsS http://localhost:7080/healthz > /dev/null || exit 1
 
 CMD ["uvicorn", "freedium_library.api.app:app", "--host", "0.0.0.0", "--port", "7080", "--log-level", "warning"]

@@ -52,6 +52,11 @@ def create_application() -> FastAPI:
     )
 
     register_router(app, settings.prefix_path, config=config)
+
+    @app.get("/healthz", include_in_schema=False)
+    def _healthz() -> dict[str, str]:
+        return {"status": "ok"}
+
     register_error_handler(app)
     register_middlewares(app)
 

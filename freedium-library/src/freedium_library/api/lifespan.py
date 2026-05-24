@@ -1,4 +1,5 @@
 import asyncio
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -67,14 +68,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Warm up the recent-posts feed in the background so the home page
     # shows real article metadata when Medium is reachable. Non-blocking:
     # the API starts serving immediately even while warmup is in flight.
-    warmup_task = asyncio.create_task(
-        _warmup_recent_feed(medium_service, recent_posts_service, SEED_URLS)
-    )
+    if os.environ.get("FREEDIUM_DISABLE_WARMUP", "").lower() in ("1", "true", "yes"):
+        warmup_task = None
+    else:
+        warmup_task = asyncio.create_task(
+            _warmup_recent_feed(medium_service, recent_posts_service, SEED_URLS)
+        )
 
     yield
 
     # Cancel any in-flight warmup so it doesn't outlive the app
-    if not warmup_task.done():
+    if warmup_task is not None and not warmup_task.done():
         warmup_task.cancel()
         try:
             await warmup_task

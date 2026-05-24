@@ -35,6 +35,9 @@ api = [
     "fastapi[standard]>=0.115.12",
     "prometheus-fastapi-instrumentator>=7.0.0",
 ]
+migrate = [
+    "psycopg2-binary>=2.9.9",
+]
 [tool.pdm]
 distribution = false
 

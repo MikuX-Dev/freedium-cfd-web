@@ -41,6 +41,25 @@ RUN pip install /deps/medium-parser
 COPY freedium-library /app/freedium-library
 RUN pip install "/app/freedium-library[api]"
 
+# --- Build the Rust extension ---
+# Install Rust toolchain via rustup into a builder-stage-only directory.
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+       | sh -s -- -y --profile minimal --default-toolchain 1.82 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir maturin
+
+COPY freedium_rust_core /deps/freedium_rust_core
+RUN cd /deps/freedium_rust_core \
+    && maturin build --release --out /wheels --interpreter python3.12 \
+    && pip install /wheels/freedium_rust_core-*.whl
+
 # ---------- runtime stage ----------
 FROM python:3.12-slim AS runtime
 

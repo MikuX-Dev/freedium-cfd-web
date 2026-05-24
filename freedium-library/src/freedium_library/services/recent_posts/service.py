@@ -1,34 +1,40 @@
 from __future__ import annotations
 
-import asyncio
+import os
 import time
-from collections import deque
-from collections.abc import Iterable
 
 from beartype import beartype
 from loguru import logger
+from redis.asyncio import Redis
 
 from freedium_library.services.medium.renderer import PostMetadata
-
 from .models import RecentPost
 
 
 _DEFAULT_BUFFER_SIZE = 200
+_SORTED_SET_KEY = "freedium:recent_posts"
+_HASH_KEY = "freedium:recent_posts_data"
 
 
 class RecentPostsService:
-    """In-memory ring buffer of recently rendered posts.
+    """Redis-backed ring buffer of recently rendered posts.
 
-    Why in-memory: keeps the home-page feed working without requiring an
-    operator to provision MongoDB just to run the API. If persistence
-    across restarts is needed later, swap the deque for a cache backend
-    behind the same async interface — call sites won't change.
+    Uses a sorted set (scores = unlocked_at timestamps) for ordering
+    and deduplication, plus a hash for the full post data. Shared
+    across all uvicorn workers via the stack's Redis instance.
+
+    Falls back to a no-op if Redis is unreachable — the home page
+    shows "no recent unlocks" rather than crashing.
     """
 
-    def __init__(self, max_size: int = _DEFAULT_BUFFER_SIZE) -> None:
-        self._buffer: deque[RecentPost] = deque(maxlen=max_size)
-        self._index: dict[str, RecentPost] = {}
-        self._lock = asyncio.Lock()
+    def __init__(
+        self,
+        redis_url: str | None = None,
+        max_size: int = _DEFAULT_BUFFER_SIZE,
+    ) -> None:
+        self._max_size = max_size
+        url = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        self._redis: Redis = Redis.from_url(url, decode_responses=True)
 
     @beartype
     async def record(self, metadata: PostMetadata) -> None:
@@ -41,41 +47,36 @@ class RecentPostsService:
         if not post.post_id:
             return
 
-        async with self._lock:
-            existing = self._index.get(post.post_id)
-            if existing is not None:
-                try:
-                    self._buffer.remove(existing)
-                except ValueError:
-                    pass
-            self._buffer.appendleft(post)
-            self._index[post.post_id] = post
-            self._prune_index_locked()
-
-        logger.debug(f"RecentPostsService: recorded {post.post_id}")
+        try:
+            pipe = self._redis.pipeline()
+            now = post.unlocked_at or int(time.time() * 1000)
+            pipe.zadd(_SORTED_SET_KEY, {post.post_id: now})
+            pipe.hset(_HASH_KEY, post.post_id, post.model_dump_json())
+            # Trim oldest entries beyond max_size
+            pipe.zremrangebyrank(_SORTED_SET_KEY, 0, -(self._max_size + 1))
+            await pipe.execute()
+            logger.debug(f"RecentPostsService: recorded {post.post_id}")
+        except Exception as exc:
+            logger.warning(f"RecentPostsService.record failed: {exc!r}")
 
     @beartype
     async def list(self, limit: int = 20) -> list[RecentPost]:
         """Return the most recently rendered posts, newest first."""
         if limit <= 0:
             return []
-        async with self._lock:
-            return list(self._iter_first_n(self._buffer, limit))
-
-    def _prune_index_locked(self) -> None:
-        """Drop index entries for posts that fell out of the ring buffer."""
-        if len(self._index) <= len(self._buffer):
-            return
-        live_ids = {p.post_id for p in self._buffer}
-        for stale_id in [k for k in self._index if k not in live_ids]:
-            del self._index[stale_id]
-
-    @staticmethod
-    def _iter_first_n(items: Iterable[RecentPost], n: int) -> Iterable[RecentPost]:
-        for i, item in enumerate(items):
-            if i >= n:
-                break
-            yield item
+        try:
+            post_ids = await self._redis.zrevrange(_SORTED_SET_KEY, 0, limit - 1)
+            if not post_ids:
+                return []
+            raw_values = await self._redis.hmget(_HASH_KEY, *post_ids)
+            posts = []
+            for raw in raw_values:
+                if raw:
+                    posts.append(RecentPost.model_validate_json(raw))
+            return posts
+        except Exception as exc:
+            logger.warning(f"RecentPostsService.list failed: {exc!r}")
+            return []
 
     @staticmethod
     def _from_metadata(metadata: PostMetadata) -> RecentPost:

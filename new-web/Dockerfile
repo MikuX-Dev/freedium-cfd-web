@@ -34,7 +34,12 @@ COPY --from=build /app/build ./build
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 
+# Ownership for the working directory so the non-root user can read it
+RUN chown -R bun:bun /app
+
 EXPOSE 3000
+
+USER bun
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD wget -qO- http://localhost:3000/metrics > /dev/null || exit 1

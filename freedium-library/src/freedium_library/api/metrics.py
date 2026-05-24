@@ -24,6 +24,17 @@ class _MetricPair:
     histogram: Histogram
 
 
+# `freedium_article_render_total` outcomes intentionally differ from
+# the frontend's `freedium_web_article_fetch_total` outcomes:
+#
+#   Backend (here): success | parser_failure | upstream_4xx | upstream_5xx | network_error
+#   Frontend:       success | upstream_error | network_fail | not_found
+#
+# The backend tracks render-level distinctions visible to the FastAPI
+# handler (parser fail vs Medium 4xx vs 5xx). The frontend tracks
+# SSR-fetch-level distinctions visible to SvelteKit's loader.
+# Operators correlating spikes across the two metrics should expect
+# a 1-to-many mapping, not a name match.
 ARTICLE_RENDER = _MetricPair(
     counter=Counter(
         "freedium_article_render_total",

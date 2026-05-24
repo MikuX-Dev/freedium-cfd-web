@@ -24,6 +24,21 @@ const httpDuration = new Histogram({
 	registers: [registry],
 });
 
+/**
+ * `freedium_web_article_fetch_total` outcomes intentionally differ from
+ * the backend's `freedium_article_render_total` outcomes:
+ *
+ *   Frontend (here):  success | upstream_error | network_fail | not_found
+ *   Backend:          success | parser_failure | upstream_4xx | upstream_5xx | network_error
+ *
+ * The frontend tracks SSR-fetch-level distinctions visible to the
+ * SvelteKit loader (did the upstream proxy fail? did SvelteKit
+ * surface ARTICLE_NOT_FOUND?). The backend tracks render-level
+ * distinctions visible to the FastAPI handler (did the parser fail?
+ * did Medium return 4xx vs 5xx?). Operators correlating spikes
+ * across the two metrics should expect a 1-to-many mapping, not
+ * a name match.
+ */
 const articleFetch = new Counter({
 	name: "freedium_web_article_fetch_total",
 	help: "SSR-side article-render attempts on the frontend, by outcome.",

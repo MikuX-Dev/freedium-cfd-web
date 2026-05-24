@@ -12,7 +12,10 @@ from ..models import CacheResponse
 from .base import AbstractCacheBackend
 
 
-_ZSTD_LEVEL = 3
+# Cache is write-once / read-many. Level 19 costs ~3-10x more CPU at write
+# time (one-shot per cache miss) but adds ~25-40% to the compression ratio
+# vs. level 3. Decompression speed is level-independent.
+_ZSTD_LEVEL = 19
 _compressor = zstd.ZstdCompressor(level=_ZSTD_LEVEL)
 _decompressor = zstd.ZstdDecompressor()
 

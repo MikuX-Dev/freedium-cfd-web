@@ -75,7 +75,7 @@ async def test_stored_doc_has_zstd_marker(backend):
     """Confirm the document on disk is compressed, not raw."""
     await backend.apush("k", "x" * 5000)
     doc = await backend.collection.find_one({"_id": "k"})
-    assert doc["compression"] == "zstd"
+    assert doc["compression"] in ("zstd", "zstd_dict_v1")
     assert isinstance(doc["value"], bytes)
     # zstd-compressed 5000 bytes of "x" should be << 5000 bytes
     assert len(doc["value"]) < 200
@@ -87,3 +87,70 @@ async def test_compression_is_lossless(backend):
     await backend.apush("k", payload)
     result = await backend.apull("k")
     assert result.value == payload
+
+
+@pytest.mark.asyncio
+async def test_backward_compat_plain_zstd_documents_still_decompress(backend):
+    """Documents written by the old (no-dict) backend must still pull."""
+    import zstandard as zstd
+    import datetime as dt
+
+    raw = '{"hello": "world"}'
+    blob = zstd.ZstdCompressor(level=19).compress(raw.encode("utf-8"))
+
+    await backend.collection.update_one(
+        {"_id": "legacy_key"},
+        {
+            "$set": {
+                "value": blob,
+                "compression": "zstd",
+                "updated_at": dt.datetime.utcnow(),
+            },
+            "$setOnInsert": {"created_at": dt.datetime.utcnow()},
+        },
+        upsert=True,
+    )
+
+    result = await backend.apull("legacy_key")
+    assert result is not None
+    assert result.value == raw
+
+
+@pytest.mark.asyncio
+async def test_missing_dictionary_falls_back_to_plain_zstd(monkeypatch):
+    """Simulate a deployment where dict_v1.zstd is missing — pushes should
+    succeed with compression='zstd' tag instead of 'zstd_dict_v1'."""
+    import freedium_library.utils.cache.db.mongo as mongo_mod
+
+    monkeypatch.setattr(mongo_mod, "_dict", None)
+    monkeypatch.setattr(mongo_mod, "_compressor_dict", None)
+    monkeypatch.setattr(mongo_mod, "_decompressor_dict", None)
+
+    blob, tag = mongo_mod._compress("hello")
+    assert tag == "zstd"
+
+    out = mongo_mod._decompress(blob, tag)
+    assert out == "hello"
+
+
+@pytest.mark.asyncio
+async def test_unknown_compression_tag_raises(backend, monkeypatch):
+    """Defensive: a document with a bogus compression tag must raise,
+    not silently return garbage."""
+    import datetime as dt
+
+    await backend.collection.update_one(
+        {"_id": "bad"},
+        {
+            "$set": {
+                "value": b"xx",
+                "compression": "snappy_v9000",
+                "updated_at": dt.datetime.utcnow(),
+            },
+            "$setOnInsert": {"created_at": dt.datetime.utcnow()},
+        },
+        upsert=True,
+    )
+
+    with pytest.raises(ValueError, match="unknown compression tag"):
+        await backend.apull("bad")

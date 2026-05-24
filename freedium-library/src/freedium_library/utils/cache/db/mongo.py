@@ -15,17 +15,76 @@ from .base import AbstractCacheBackend
 # Cache is write-once / read-many. Level 19 costs ~3-10x more CPU at write
 # time (one-shot per cache miss) but adds ~25-40% to the compression ratio
 # vs. level 3. Decompression speed is level-independent.
+import importlib.resources as _resources
+
+
 _ZSTD_LEVEL = 19
-_compressor = zstd.ZstdCompressor(level=_ZSTD_LEVEL)
-_decompressor = zstd.ZstdDecompressor()
+_DICT_FILENAME = "dict_v1.zstd"
+_DICT_COMPRESSION_TAG = "zstd_dict_v1"
+_PLAIN_COMPRESSION_TAG = "zstd"
 
 
-def _compress(value_str: str) -> bytes:
-    return _compressor.compress(value_str.encode("utf-8"))
+def _load_dict() -> "zstd.ZstdCompressionDict | None":
+    """Load the bundled dictionary if it exists and is non-empty.
+
+    Returns None on missing/empty/corrupt dict; callers fall back to
+    plain (no-dict) zstd compression.
+    """
+    try:
+        pkg_root = _resources.files("freedium_library.utils.cache.db")
+        path = pkg_root / _DICT_FILENAME
+        with path.open("rb") as fh:
+            blob = fh.read()
+    except (FileNotFoundError, ModuleNotFoundError, AttributeError):
+        return None
+    if not blob:
+        return None
+    try:
+        return zstd.ZstdCompressionDict(blob)
+    except zstd.ZstdError:
+        return None
 
 
-def _decompress(blob: bytes) -> str:
-    return _decompressor.decompress(blob).decode("utf-8")
+_dict = _load_dict()
+
+if _dict is not None:
+    _compressor_dict = zstd.ZstdCompressor(level=_ZSTD_LEVEL, dict_data=_dict)
+    _decompressor_dict = zstd.ZstdDecompressor(dict_data=_dict)
+else:
+    _compressor_dict = None
+    _decompressor_dict = None
+
+_compressor_plain = zstd.ZstdCompressor(level=_ZSTD_LEVEL)
+_decompressor_plain = zstd.ZstdDecompressor()
+
+
+def _compress(value_str: str) -> tuple[bytes, str]:
+    """Compress value_str. Returns (blob, compression_tag).
+
+    Uses the trained dictionary when available; falls back to plain zstd
+    when the dictionary file is missing or unreadable.
+    """
+    raw = value_str.encode("utf-8")
+    if _compressor_dict is not None:
+        return _compressor_dict.compress(raw), _DICT_COMPRESSION_TAG
+    return _compressor_plain.compress(raw), _PLAIN_COMPRESSION_TAG
+
+
+def _decompress(blob: bytes, compression_tag: str) -> str:
+    """Decompress blob according to the on-document compression tag.
+
+    Supports both 'zstd_dict_v1' (uses bundled dict) and 'zstd' (plain).
+    """
+    if compression_tag == _DICT_COMPRESSION_TAG:
+        if _decompressor_dict is None:
+            raise RuntimeError(
+                f"Document tagged {_DICT_COMPRESSION_TAG} but no "
+                f"dictionary available — was dict_v1.zstd shipped?"
+            )
+        return _decompressor_dict.decompress(blob).decode("utf-8")
+    if compression_tag == _PLAIN_COMPRESSION_TAG:
+        return _decompressor_plain.decompress(blob).decode("utf-8")
+    raise ValueError(f"unknown compression tag: {compression_tag!r}")
 
 
 class MongoDBCacheBackend(AbstractCacheBackend):
@@ -177,10 +236,11 @@ class AsyncMongoDBCacheBackend(AbstractCacheBackend):
         await self.aensure_connection()
         pipeline = [{"$sample": {"size": size}}]
         results = await self.collection.aggregate(pipeline).to_list(None)
-        return [
-            CacheResponse(doc["_id"], _decompress(doc["value"]))
-            for doc in results
-        ]
+        out = []
+        for doc in results:
+            compression = doc.get("compression", _PLAIN_COMPRESSION_TAG)
+            out.append(CacheResponse(doc["_id"], _decompress(doc["value"], compression)))
+        return out
 
     def pull(self, key: str) -> Union[CacheResponse, None]:
         raise NotImplementedError("Use apull() on AsyncMongoDBCacheBackend")
@@ -192,7 +252,8 @@ class AsyncMongoDBCacheBackend(AbstractCacheBackend):
             logger.debug(f"No value found for key: {key}")
             return None
         logger.debug("Value found in DB, returning it")
-        return CacheResponse(key, _decompress(doc["value"]))
+        compression = doc.get("compression", _PLAIN_COMPRESSION_TAG)
+        return CacheResponse(key, _decompress(doc["value"], compression))
 
     def push(self, key: str, value: Union[str, dict]) -> None:
         raise NotImplementedError("Use apush() on AsyncMongoDBCacheBackend")
@@ -208,13 +269,14 @@ class AsyncMongoDBCacheBackend(AbstractCacheBackend):
             )
 
         await self.aensure_connection()
+        blob, compression_tag = _compress(value_str)
         now = _dt.datetime.utcnow()
         await self.collection.update_one(
             {"_id": key},
             {
                 "$set": {
-                    "value": _compress(value_str),
-                    "compression": "zstd",
+                    "value": blob,
+                    "compression": compression_tag,
                     "updated_at": now,
                 },
                 "$setOnInsert": {"created_at": now},

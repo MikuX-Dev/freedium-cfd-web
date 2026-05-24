@@ -1,12 +1,28 @@
+import datetime as _dt
 from typing import Union
 
 import pymongo
+import zstandard as zstd
+from loguru import logger
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from freedium_library.utils.json import json
 
 from ..models import CacheResponse
 from .base import AbstractCacheBackend
+
+
+_ZSTD_LEVEL = 3
+_compressor = zstd.ZstdCompressor(level=_ZSTD_LEVEL)
+_decompressor = zstd.ZstdDecompressor()
+
+
+def _compress(value_str: str) -> bytes:
+    return _compressor.compress(value_str.encode("utf-8"))
+
+
+def _decompress(blob: bytes) -> str:
+    return _decompressor.decompress(blob).decode("utf-8")
 
 
 class MongoDBCacheBackend(AbstractCacheBackend):
@@ -90,48 +106,138 @@ class MongoDBCacheBackend(AbstractCacheBackend):
 
 
 class AsyncMongoDBCacheBackend(AbstractCacheBackend):
+    """Async Mongo cache with transparent zstd compression.
+
+    Documents:
+        {
+            "_id": <post_id>,
+            "value": BinData(zstd-compressed JSON),
+            "compression": "zstd",
+            "created_at": ISODate,
+            "updated_at": ISODate,
+        }
+    """
+
     def __init__(
         self,
         connection_string: str,
-        database: str = "cache_db",
-        collection: str = "cache",
+        database: str = "freedium_cache",
+        collection: str = "post_cache",
     ):
         self.connection_string = connection_string
         self.database_name = database
         self.collection_name = collection
-        self.client = None
+        self.client: AsyncIOMotorClient | None = None
         self.db = None
         self.collection = None
         self.connect()
 
-    def connect(self):
+    def connect(self) -> None:
         self.client = AsyncIOMotorClient(self.connection_string)
         self.db = self.client[self.database_name]
         self.collection = self.db[self.collection_name]
 
-    async def aensure_connection(self):
+    def ensure_connection(self) -> None:
         if self.client is None:
             self.connect()
 
-    async def ainit_db(self):
+    async def aensure_connection(self) -> None:
+        if self.client is None:
+            self.connect()
+
+    def init_db(self) -> None:
+        """Idempotent; _id is implicitly indexed. No-op kept for symmetry."""
+        self.ensure_connection()
+
+    async def ainit_db(self) -> None:
+        """Idempotent; _id is implicitly indexed. No-op kept for symmetry."""
         await self.aensure_connection()
-        await self.collection.create_index("key", unique=True)
+
+    def all(self):
+        raise NotImplementedError("Use aall() on AsyncMongoDBCacheBackend")
 
     async def aall(self):
         await self.aensure_connection()
         return await self.collection.find().to_list(None)
 
+    def all_length(self) -> int:
+        raise NotImplementedError("Use aall_length() on AsyncMongoDBCacheBackend")
+
     async def aall_length(self) -> int:
         await self.aensure_connection()
         return await self.collection.count_documents({})
+
+    def random(self, size: int) -> list[CacheResponse]:
+        raise NotImplementedError("Use arandom() on AsyncMongoDBCacheBackend")
 
     async def arandom(self, size: int) -> list[CacheResponse]:
         await self.aensure_connection()
         pipeline = [{"$sample": {"size": size}}]
         results = await self.collection.aggregate(pipeline).to_list(None)
-        return [CacheResponse(doc["key"], doc["value"]) for doc in results]
+        return [
+            CacheResponse(doc["_id"], _decompress(doc["value"]))
+            for doc in results
+        ]
 
-    async def aclose(self):
+    def pull(self, key: str) -> Union[CacheResponse, None]:
+        raise NotImplementedError("Use apull() on AsyncMongoDBCacheBackend")
+
+    async def apull(self, key: str) -> Union[CacheResponse, None]:
+        await self.aensure_connection()
+        doc = await self.collection.find_one({"_id": key})
+        if doc is None:
+            logger.debug(f"No value found for key: {key}")
+            return None
+        logger.debug("Value found in DB, returning it")
+        return CacheResponse(key, _decompress(doc["value"]))
+
+    def push(self, key: str, value: Union[str, dict]) -> None:
+        raise NotImplementedError("Use apush() on AsyncMongoDBCacheBackend")
+
+    async def apush(self, key: str, value: Union[str, dict]) -> None:
+        if isinstance(value, dict):
+            value_str = json.dumps(value)
+        elif isinstance(value, str):
+            value_str = value
+        else:
+            raise ValueError(
+                f"value argument should be a string or dict, not {type(value).__name__}"
+            )
+
+        await self.aensure_connection()
+        now = _dt.datetime.utcnow()
+        await self.collection.update_one(
+            {"_id": key},
+            {
+                "$set": {
+                    "value": _compress(value_str),
+                    "compression": "zstd",
+                    "updated_at": now,
+                },
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=True,
+        )
+
+    async def aexists(self, key: str) -> bool:
+        await self.aensure_connection()
+        return await self.collection.count_documents({"_id": key}, limit=1) > 0
+
+    def delete(self, key: str) -> None:
+        raise NotImplementedError("Use adelete() on AsyncMongoDBCacheBackend")
+
+    async def adelete(self, key: str) -> None:
+        await self.aensure_connection()
+        result = await self.collection.delete_one({"_id": key})
+        if result.deleted_count > 0:
+            logger.debug(f"Deleted key: {key}")
+        else:
+            logger.warning(f"Attempted to delete non-existing key: {key}")
+
+    def close(self) -> None:
+        raise NotImplementedError("Use aclose() on AsyncMongoDBCacheBackend")
+
+    async def aclose(self) -> None:
         if self.client:
             self.client.close()
             self.client = None

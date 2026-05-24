@@ -27,3 +27,12 @@ export async function recentPosts(limit = 20): Promise<RecentPost[]> {
 
 	return response?.posts ?? [];
 }
+
+export async function randomPosts(limit = 20): Promise<RecentPost[]> {
+	const response = await apiFetch<RecentPostsResponse>("/articles/random", {
+		method: "GET",
+		query: { limit },
+	});
+
+	return response?.posts ?? [];
+}

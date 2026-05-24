@@ -1,4 +1,4 @@
-import { recentPosts, type RecentPost } from "@/services";
+import { recentPosts, randomPosts, type RecentPost } from "@/services";
 import type { BlogPost } from "$lib/types";
 import type { PageServerLoad } from "./$types";
 
@@ -79,10 +79,14 @@ function interleave(
 
 export const load: PageServerLoad = async () => {
 	let feed: RecentPost[] = [];
+	let randomFeed: RecentPost[] = [];
 	let backendError: string | null = null;
 
 	try {
-		feed = await recentPosts(FEED_LIMIT);
+		[feed, randomFeed] = await Promise.all([
+			recentPosts(FEED_LIMIT),
+			randomPosts(FEED_LIMIT),
+		]);
 	} catch (err) {
 		// Backend offline or returned non-2xx — render the page with no posts
 		// rather than failing the whole route. The hero still works because
@@ -95,8 +99,13 @@ export const load: PageServerLoad = async () => {
 	const merged = interleave(feedAsBlogPosts, EDITORIAL_CARDS);
 	const items: BlogPost[] = merged.map((post, id) => ({ ...post, id }));
 
+	const randomAsBlogPosts = randomFeed.map((p, i) => toBlogPost(p, i));
+	const randomMerged = interleave(randomAsBlogPosts, EDITORIAL_CARDS);
+	const randomItems: BlogPost[] = randomMerged.map((post, id) => ({ ...post, id }));
+
 	return {
 		items,
+		randomItems,
 		isFeedEmpty: feed.length === 0,
 		backendError,
 	};

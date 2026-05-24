@@ -1,3 +1,3 @@
 export { render } from "./render";
-export { recentPosts, type RecentPost } from "./articles";
+export { recentPosts, randomPosts, type RecentPost } from "./articles";
 export { articleDownloadUrl } from "./markdown";

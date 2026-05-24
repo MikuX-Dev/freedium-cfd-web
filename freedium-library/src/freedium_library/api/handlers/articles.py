@@ -44,4 +44,40 @@ def register_articles_router(router: APIRouter) -> None:
         response_model=RecentPostsResponse,
     )
 
+    async def get_random_articles(
+        limit: int = Query(
+            20, ge=1, le=100, description="Maximum number of random posts to return"
+        ),
+    ) -> RecentPostsResponse:
+        import json
+        import os
+
+        from redis.asyncio import Redis
+
+        from freedium_library.services.recent_posts.models import RecentPost
+
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        r = Redis.from_url(redis_url, decode_responses=True)
+        try:
+            raw = await r.get("freedium:random_posts")
+            if not raw:
+                return RecentPostsResponse(posts=[])
+            posts_json_list = json.loads(raw)
+            posts = [RecentPost.model_validate_json(p) for p in posts_json_list[:limit]]
+            return RecentPostsResponse(posts=posts)
+        except Exception:  # noqa: BLE001
+            return RecentPostsResponse(posts=[])
+        finally:
+            await r.aclose()
+
+    articles_router.add_api_route(
+        "/random",
+        endpoint=get_random_articles,
+        methods=["GET"],
+        summary="Random posts from the cache",
+        description="Returns a random sample of recently-rendered posts, refreshed every 2 minutes.",
+        tags=["articles"],
+        response_model=RecentPostsResponse,
+    )
+
     router.include_router(articles_router)

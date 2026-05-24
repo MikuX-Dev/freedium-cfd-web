@@ -11,8 +11,13 @@
   let activeFilter = $state('Latest');
   const filters = ['Latest', 'Trending', 'This week', 'Long reads', 'Following'];
 
-  const items = $derived<BlogPost[]>(data.items);
-  const isEmpty = $derived(items.length === 0);
+  const recentItems = $derived<BlogPost[]>(data.items);
+  const randomItems = $derived<BlogPost[]>(data.randomItems ?? []);
+
+  const displayItems = $derived<BlogPost[]>(
+    activeFilter === 'Trending' ? randomItems : recentItems
+  );
+  const isEmpty = $derived(displayItems.length === 0);
 </script>
 
 <svelte:head>
@@ -47,7 +52,7 @@
   </div>
 {:else}
   <div class="feed">
-    {#each items as item (item.id)}
+    {#each displayItems as item (item.id)}
       <BlogCard {...item} />
     {/each}
   </div>

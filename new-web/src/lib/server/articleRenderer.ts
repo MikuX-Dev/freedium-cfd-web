@@ -514,7 +514,14 @@ export async function renderArticle(
 	// Prefer the headings collected from the actual rendered HTML (correct ids +
 	// real levels) over the flat frontmatter fallback.
 	if (article && tocAcc.length) {
-		article.tableOfContents = tocAcc;
+		// Drop leading "orphan" headings deeper than the shallowest level that
+		// appear before the first top-level heading — e.g. a caption/attribution
+		// the author rendered as an H4 above the first real section. Genuinely
+		// nested deeper headings elsewhere are kept.
+		const minLevel = Math.min(...tocAcc.map((t) => t.level));
+		let start = 0;
+		while (start < tocAcc.length && tocAcc[start].level > minLevel) start++;
+		article.tableOfContents = tocAcc.slice(start);
 	}
 
 	// Render the cover-image caption through the SAME pipeline so markdown spans

@@ -57,6 +57,17 @@ async def _warmup_recent_feed(
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     register_error_log_sink()
+
+    # TaskIQ result backend — used by /render/poll/{task_id} to check
+    # render results produced by the worker process. Startup ensures
+    # the Redis connection pool is warm.
+    from freedium_library.tasks import result_backend as _rb
+
+    try:
+        await _rb.startup()
+    except Exception:
+        pass  # Redis unavailable — poll endpoint returns 404
+
     app.state.container = api_container
     app.state.cache_container = cache_container
     app.state.medium_container = medium_container
@@ -121,6 +132,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Unwire on shutdown
     medium_container.unwire()
     recent_posts_container.unwire()
+
+    try:
+        await _rb.shutdown()
+    except Exception:
+        pass
 
     if _cache_settings.CACHE_ENABLED:
         try:

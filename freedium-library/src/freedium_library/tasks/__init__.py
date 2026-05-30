@@ -3,14 +3,22 @@
 The broker connects to Redis and dispatches async tasks to worker
 processes. Tasks here are designed to be fire-and-forget from the
 request handler — failures are logged but never propagate to the user.
+
+A RedisAsyncResultBackend is configured so callers can wait for results
+via task.wait_result() or poll via result_backend.get_result(task_id).
 """
-from taskiq_redis import ListQueueBroker, RedisScheduleSource
+from taskiq_redis import ListQueueBroker, RedisAsyncResultBackend, RedisScheduleSource
 from taskiq import TaskiqScheduler
 import os
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
-broker = ListQueueBroker(url=REDIS_URL)
+result_backend = RedisAsyncResultBackend(
+    redis_url=REDIS_URL,
+    keep_results=True,
+)
+
+broker = ListQueueBroker(url=REDIS_URL).with_result_backend(result_backend)
 
 scheduler = TaskiqScheduler(
     broker=broker,

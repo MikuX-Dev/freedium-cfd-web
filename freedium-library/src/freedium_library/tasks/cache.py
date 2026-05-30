@@ -126,103 +126,60 @@ async def warm_cache(url: str) -> None:
 # L1 caches miss. Runs inside the TaskIQ worker so uvicorn workers
 # never block on a 20-60s Medium GraphQL fetch through WARP.
 #
-# The handler returns 202 {task_id, status:"pending"} immediately.
-# The frontend polls GET /api/render/poll/{task_id} until the task
-# finishes and posts the result to Redis.
+# Uses TaskIQ's built-in result backend (RedisAsyncResultBackend) —
+# the result is stored automatically via the broker's return-value
+# mechanism. No manual Redis keys needed.
 # ------------------------------------------------------------------
 
-import json as _json
-import os as _os
-from uuid import uuid4 as _uuid4
-
-import httpx
-from loguru import logger as _logger
-from redis.asyncio import Redis as _Redis
-
-from freedium_library.api.metrics import ARTICLE_RENDER, ERRORED_LINKS, PDF_RENDER
-from freedium_library.services.medium import MediumService
 from freedium_library.services.medium.container import MediumContainer
 from freedium_library.services.resolver import ServiceResolver
-from freedium_library.utils.cache.db.mongo import AsyncMongoDBCacheBackend as _Mongo
-from freedium_library.utils.json import json
 
 from . import broker
 
-_RENDER_TTL = 300  # seconds — worst-case render timeout
-_REDIS_PREFIX = "freedium:render"
-
 
 @broker.task
-async def render_article_async(content: str, frontmatter: bool, task_id: str) -> None:
+async def render_article_async(content: str, frontmatter: bool) -> dict:
     """Full render pipeline for a cold-cache article.
 
-    Runs in the TaskIQ worker so the uvicorn handler can return
-    202 Accepted immediately. The result is written to Redis for
-    the poll endpoint to serve.
-    """
+    Returns {"markdown": ..., "service": ...} which TaskIQ stores in
+    the configured RedisAsyncResultBackend. The caller waits via
+    task.wait_result() and the poll endpoint reads via
+    result_backend.get_result(task_id).
 
-    async def _fail(error_msg: str) -> None:
-        r = _Redis.from_url(
-            _os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
-            decode_responses=True,
-        )
-        try:
-            await r.setex(
-                f"{_REDIS_PREFIX}:{task_id}", _RENDER_TTL,
-                _json.dumps({"status": "error", "error": error_msg[:500]}),
+    A plain Exception raised here becomes `result.is_err = True`.
+    The poll endpoint surfaces a user-safe error message.
+    """
+    container = MediumContainer()
+    service = container.service()
+    resolver = ServiceResolver()
+    resolver.register("medium", service)
+
+    service_name, resolved_service = await resolver.resolve(content)
+
+    if service_name == "medium":
+        if frontmatter:
+            markdown, _metadata = (
+                await service.arender_with_frontmatter_and_metadata(content)
             )
-        finally:
-            await r.aclose()
+        else:
+            markdown, _metadata = await service.arender_with_metadata(content)
+    else:
+        markdown = (
+            await resolved_service.arender_with_frontmatter(content)
+            if frontmatter
+            else await resolved_service.arender(content)
+        )
+
+    # Write L2 cache in background
+    from freedium_library.tasks.cache import (
+        embed_images_in_cache,
+        write_rendered_cache,
+    )
 
     try:
-        container = MediumContainer()
-        service: MediumService = container.service()
-        resolver = ServiceResolver()
-        resolver.register("medium", service)
+        await write_rendered_cache.kiq(content, markdown, service_name)
+        await embed_images_in_cache.kiq(content, markdown, service_name)
+    except Exception:
+        pass
 
-        service_name, resolved_service = await resolver.resolve(content)
-
-        if service_name == "medium":
-            if frontmatter:
-                markdown, _metadata = (
-                    await service.arender_with_frontmatter_and_metadata(content)
-                )
-            else:
-                markdown, _metadata = await service.arender_with_metadata(content)
-        else:
-            markdown = (
-                await resolved_service.arender_with_frontmatter(content)
-                if frontmatter
-                else await resolved_service.arender(content)
-            )
-
-        # Store in Redis for the poll endpoint
-        r = _Redis.from_url(
-            _os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
-            decode_responses=True,
-        )
-        try:
-            await r.setex(
-                f"{_REDIS_PREFIX}:{task_id}", _RENDER_TTL,
-                _json.dumps(
-                    {"markdown": markdown, "service": service_name, "status": "done"}
-                ),
-            )
-        finally:
-            await r.aclose()
-
-        # Write L2 cache in background
-        from freedium_library.tasks.cache import (
-            embed_images_in_cache,
-            write_rendered_cache,
-        )
-
-        try:
-            await write_rendered_cache.kiq(content, markdown, service_name)
-            await embed_images_in_cache.kiq(content, markdown, service_name)
-        except Exception:
-            pass
-
-    except Exception as exc:
-        _logger.exception(f"render_article_async failed: {exc!r}")
-        await _fail(str(exc))
+    return {"markdown": markdown, "service": service_name}

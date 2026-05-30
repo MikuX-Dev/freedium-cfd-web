@@ -139,27 +139,23 @@ async def render_universal(
 
     # Cold render: dispatch to TaskIQ worker so uvicorn workers stay
     # free for L2-cached requests. The frontend polls /render/poll/
-    # until the worker finishes.
-    from uuid import uuid4
-
+    # until the worker's result is ready via the RedisAsyncResultBackend.
     from freedium_library.tasks.cache import render_article_async
 
-    task_id = str(uuid4())
     try:
-        await render_article_async.kiq(
+        dispatch = await render_article_async.kiq(
             content=request.content,
             frontmatter=request.frontmatter,
-            task_id=task_id,
         )
     except Exception:
         # Broker unreachable — fall through to synchronous render
         pass
     else:
-        return RenderResponse(  # type: ignore[return-type]
+        return RenderResponse(
             markdown="",
             service="pending",
             cache_status="pending",
-            task_id=task_id,
+            task_id=dispatch.task_id,
         )
 
     with track_render(ARTICLE_RENDER) as ctx:
@@ -253,23 +249,23 @@ def register_render_router(router: APIRouter) -> None:
     # TaskIQ render poll endpoint — the frontend calls this after
     # receiving 202 {task_id} from render_universal.
     async def _poll_render_task(task_id: str):
-        import os as _poll_os
+        from freedium_library.tasks import result_backend
 
-        from redis.asyncio import Redis
-
-        r = Redis.from_url(
-            _poll_os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
-            decode_responses=True,
-        )
         try:
-            import json as _json
+            ready = await result_backend.is_result_ready(task_id)
+        except Exception:
+            raise HTTPException(status_code=404, detail="Task not found")
 
-            raw = await r.get(f"freedium:render:{task_id}")
-            if raw is None:
-                raise HTTPException(status_code=404, detail="Task not found")
-            return _json.loads(raw)
-        finally:
-            await r.aclose()
+        if not ready:
+            return {"status": "pending"}
+
+        result = await result_backend.get_result(task_id)
+        if result.is_err:
+            # Don't leak exception details to the frontend
+            return {"status": "error", "error": "Render failed — please try again"}
+
+        data = result.return_value  # {"markdown", "service"}
+        return {"status": "done", "markdown": data["markdown"], "service": data["service"]}
 
     render_router.add_api_route(
         "/poll/{task_id}",

@@ -18,7 +18,7 @@ class CurlRequest(AbstractRequest):
         self._in_context_manager = False
         self._session: Any = None
         self._async_session: Any = None
-        self._impersonate: Literal["chrome136"] = "chrome136"
+        self._impersonate: Literal["chrome146"] = "chrome146"
         self._http_version: Literal["v2"] = "v2"  # H2 over WARP TCP; H3 (QUIC) breaks through SOCKS5
         warnings.warn(
             "Request should be used as a context manager using 'with' or 'async with' "

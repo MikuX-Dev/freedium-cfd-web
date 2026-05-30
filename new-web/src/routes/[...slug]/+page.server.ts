@@ -1,49 +1,45 @@
 import { renderArticle } from "$lib/server/articleRenderer";
 import { recordArticleFetch } from "$lib/server/metrics";
 import type { PageServerLoad } from "./$types";
-import type { ArticleErrorCode } from "$lib/types";
 
-const ErrorCodes: Record<ArticleErrorCode, ArticleErrorCode> = {
-	ARTICLE_NOT_FOUND: "ARTICLE_NOT_FOUND",
-	RENDER_ERROR: "RENDER_ERROR",
-	COMPILE_ERROR: "COMPILE_ERROR",
-	INTERNAL_ERROR: "INTERNAL_ERROR",
-};
+/**
+ * Return the render result as a promise so SvelteKit streams the page:
+ * the loading skeleton arrives in the first HTML chunk, the rendered
+ * article body arrives later when the backend finishes. This means the
+ * user sees the page instantly (<100 ms TTFB) even on a cold cache
+ * where the backend takes 30–90 s to render a large article.
+ */
+export const load: PageServerLoad = async ({ params }) => {
+	const start = performance.now();
 
-export const load: PageServerLoad = async ({ params, setHeaders }) => {
-	try {
-		const start = performance.now();
-		const { html, markdown, article, cacheStatus } = await renderArticle(params.slug);
+	// Fire-and-forget: SvelteKit unwraps this promise and streams
+	// the resolved data. The page component uses {#await} to show
+	// a skeleton while this is pending.
+	const streamed = renderArticle(params.slug).then((result) => {
 		const renderTimeMs = Math.round(performance.now() - start);
-
-		setHeaders({
-			"X-Cache-Status": cacheStatus,
-			"X-Render-Time": `${renderTimeMs}ms`,
-		});
-
 		recordArticleFetch("success");
 		return {
-			slug: params.slug,
-			loading: false,
-			content: html,
-			markdown,
-			article,
-			error: null,
+			html: result.html,
+			markdown: result.markdown,
+			article: result.article,
+			cacheStatus: result.cacheStatus,
+			renderTimeMs,
+			error: null as { status: number; message: string; code?: string; details?: string } | null,
 		};
-	} catch (err) {
+	}).catch((err: unknown) => {
 		const message = (err as Error)?.message ?? "";
 		if (message === "ARTICLE_NOT_FOUND") {
 			recordArticleFetch("not_found");
 			return {
-				slug: params.slug,
-				loading: false,
-				content: null,
-				markdown: null,
-				article: null,
+				html: null as string | null,
+				markdown: null as string | null,
+				article: null as import("$lib/types").ArticlePageData["article"] | null,
+				cacheStatus: "miss" as string,
+				renderTimeMs: Math.round(performance.now() - start),
 				error: {
 					status: 404,
 					message: "Article not found",
-					code: ErrorCodes.ARTICLE_NOT_FOUND,
+					code: "ARTICLE_NOT_FOUND",
 				},
 			};
 		}
@@ -52,17 +48,22 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 			message.startsWith("UPSTREAM_") ? "upstream_error" : "network_fail",
 		);
 		return {
-			slug: params.slug,
-			loading: false,
-			content: null,
+			html: null,
 			markdown: null,
 			article: null,
+			cacheStatus: "miss",
+			renderTimeMs: Math.round(performance.now() - start),
 			error: {
 				status: 500,
 				message: "Failed to render article",
-				code: ErrorCodes.RENDER_ERROR,
+				code: "RENDER_ERROR",
 				details: import.meta.env.DEV ? (err as Error).message : undefined,
 			},
 		};
-	}
+	});
+
+	return {
+		slug: params.slug,
+		streamed,
+	};
 };

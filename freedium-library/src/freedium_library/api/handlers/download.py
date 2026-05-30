@@ -1,5 +1,6 @@
 """End-to-end article download: render Medium → resolve gists → file."""
 
+import os
 import re
 from collections.abc import Iterable
 
@@ -24,6 +25,8 @@ from freedium_library.services.medium.renderer import PostMetadata
 _GIST_MODE: ResolverMode = "raw"
 
 _FILENAME_SAFE_RE = re.compile(r"[^a-z0-9]+")
+
+_PUBLIC_URL = os.environ.get("FREEDIUM_PUBLIC_URL", "https://freedium-mirror.cfd").rstrip("/")
 
 
 @beartype
@@ -67,7 +70,10 @@ async def _build_download(
     (markdown, filename)."""
     markdown, metadata = await medium_service.arender_with_metadata(url)
     resolved = await resolve_gists_in_markdown(markdown, mode=_GIST_MODE)
-    body = _build_frontmatter(metadata) + "\n" + resolved
+    source_url = (getattr(metadata, "medium_url", "") or url)
+    freedium_link = f"{_PUBLIC_URL}/{source_url}"
+    link_block = f"> 📖 Read on Freedium: {freedium_link}\n>\n> 🔗 Original: {source_url}\n"
+    body = _build_frontmatter(metadata) + "\n" + link_block + "\n" + resolved
     filename = f"{_slugify(metadata.title)}.md"
     return body, filename
 

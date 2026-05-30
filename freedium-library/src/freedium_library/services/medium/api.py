@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 from typing import TYPE_CHECKING, Any
 
@@ -18,6 +19,9 @@ if TYPE_CHECKING:
     from freedium_library.services.medium.config import MediumConfig
     from freedium_library.utils.cache.db.mongo import AsyncMongoDBCacheBackend
     from freedium_library.utils.http import CurlRequest
+
+
+_GRAPHQL_RETRY_BACKOFFS: tuple[float, ...] = (0.5, 1.5)  # delays before retry 2 and 3
 
 
 def resolve_graphql_references(data: Any, root_data: dict[str, Any]) -> Any:
@@ -162,44 +166,44 @@ class MediumApiService:
         }
 
         response_data: dict[str, Any] | None = None
-        exception: Exception | None = None
         url = "https://medium.com/_/graphql"
 
         logger.debug("GraphQL request started...")
 
-        try:
-            async with self.request as request:
-                response = await request.apost(url, headers=headers, data=graphql_data)
+        response = None
+        for attempt in range(3):
+            try:
+                async with self.request as request:
+                    response = await request.apost(url, headers=headers, data=graphql_data)
+                if response.status_code == 200:
+                    break
+                logger.warning(
+                    f"GraphQL attempt {attempt + 1}/3 for {post_id}: status {response.status_code}"
+                )
+            except Exception as ex:  # connection-level failure through WARP, etc.
+                logger.warning(f"GraphQL attempt {attempt + 1}/3 for {post_id} failed: {ex!r}")
+                response = None
+            if attempt < 2:
+                await asyncio.sleep(_GRAPHQL_RETRY_BACKOFFS[attempt])
 
-                logger.debug(f"Response status code: {response.status_code}")
-
-                if response.status_code != 200:
-                    logger.error(
-                        f"Failed to fetch post by ID {post_id}\n"
-                        f"Status code: {response.status_code}\n"
-                        f"Response: {response.text[:500]}"
-                    )
-                    return None
-
-                try:
-                    response_data = JSON.loads(response.text)
-                except Exception as ex:
-                    logger.error(f"Failed to parse response as JSON: {ex}")
-                    logger.debug(f"Response text: {response.text[:500]}")
-                    exception = ex
-
-        except Exception as ex:
-            logger.error(f"Request failed for post {post_id}: {ex}")
-            logger.exception(ex)
+        if response is None or response.status_code != 200:
+            detail = (
+                f"\nStatus code: {response.status_code}\nResponse: {response.text[:500]}"
+                if response is not None
+                else " (no response / connection error)"
+            )
+            logger.error(f"Failed to fetch post by ID {post_id} after 3 attempts{detail}")
             return None
 
         logger.debug("GraphQL request finished...")
 
-        if exception:
-            logger.error(
-                f"Exception occurred while fetching post {post_id}, so let's just fuck it up"
-            )
-            raise exception
+        # response is a 200 here — parse it (UNCHANGED downstream logic)
+        try:
+            response_data = JSON.loads(response.text)
+        except Exception as ex:
+            logger.error(f"Failed to parse response as JSON: {ex}")
+            logger.debug(f"Response text: {response.text[:500]}")
+            raise
 
         if response_data is None:
             logger.warning(f"Response data is None for post {post_id}")

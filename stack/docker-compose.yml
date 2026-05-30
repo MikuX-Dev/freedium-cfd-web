@@ -5,7 +5,14 @@ services:
     build:
       context: ./wgcf-warp
     deploy:
-      replicas: 3
+      # More replicas = more distinct Cloudflare WARP exit IPs behind
+      # haproxy-pb. Medium soft-blocks individual exit IPs (returns a
+      # 200 with null post), so a larger pool + the GraphQL retry makes
+      # it very unlikely all attempts hit blocked IPs. Each fresh boot
+      # registers its own WARP identity; some may lose the registration
+      # race on startup and restart — haproxy-pb's per-slot check routes
+      # only to the ones actually answering.
+      replicas: 20
     networks:
       - freedium_obs_net
     restart: unless-stopped

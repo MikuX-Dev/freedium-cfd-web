@@ -78,35 +78,38 @@ function interleave(
 }
 
 export const load: PageServerLoad = async () => {
-	let feed: RecentPost[] = [];
-	let randomFeed: RecentPost[] = [];
-	let backendError: string | null = null;
+	// Stream posts: start fetching immediately but don't block the page.
+	// SvelteKit unwraps the promise and streams the resolved data — the
+	// hero + header render instantly (<100 ms TTFB), then the feed cards
+	// replace the skeleton when the backend API responds.
+	const streamed = Promise.all([
+		recentPosts(FEED_LIMIT).catch(() => [] as RecentPost[]),
+		randomPosts(FEED_LIMIT).catch(() => [] as RecentPost[]),
+	]).then(([feed, randomFeed]) => {
+		const feedAsBlogPosts = feed.map((p, i) => toBlogPost(p, i));
+		const merged = interleave(feedAsBlogPosts, EDITORIAL_CARDS);
+		const items: BlogPost[] = merged.map((post, id) => ({ ...post, id }));
 
-	try {
-		[feed, randomFeed] = await Promise.all([
-			recentPosts(FEED_LIMIT),
-			randomPosts(FEED_LIMIT),
-		]);
-	} catch (err) {
-		// Backend offline or returned non-2xx — render the page with no posts
-		// rather than failing the whole route. The hero still works because
-		// it doesn't depend on this data.
-		backendError = err instanceof Error ? err.message : "unknown error";
-		console.warn("Failed to fetch recent posts:", backendError);
-	}
+		const randomAsBlogPosts = randomFeed.map((p, i) => toBlogPost(p, i));
+		const randomMerged = interleave(randomAsBlogPosts, EDITORIAL_CARDS);
+		const randomItems: BlogPost[] = randomMerged.map((post, id) => ({ ...post, id }));
 
-	const feedAsBlogPosts = feed.map((p, i) => toBlogPost(p, i));
-	const merged = interleave(feedAsBlogPosts, EDITORIAL_CARDS);
-	const items: BlogPost[] = merged.map((post, id) => ({ ...post, id }));
+		return {
+			items,
+			randomItems,
+			isFeedEmpty: feed.length === 0,
+			backendError: null as string | null,
+		};
+	}).catch((err) => {
+		const msg = err instanceof Error ? err.message : "unknown error";
+		console.warn("Failed to fetch posts:", msg);
+		return {
+			items: [] as BlogPost[],
+			randomItems: [] as BlogPost[],
+			isFeedEmpty: true,
+			backendError: msg,
+		};
+	});
 
-	const randomAsBlogPosts = randomFeed.map((p, i) => toBlogPost(p, i));
-	const randomMerged = interleave(randomAsBlogPosts, EDITORIAL_CARDS);
-	const randomItems: BlogPost[] = randomMerged.map((post, id) => ({ ...post, id }));
-
-	return {
-		items,
-		randomItems,
-		isFeedEmpty: feed.length === 0,
-		backendError,
-	};
+	return { streamed };
 };

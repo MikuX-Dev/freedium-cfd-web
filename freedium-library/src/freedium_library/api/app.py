@@ -4,6 +4,18 @@ from fastapi import FastAPI
 from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
 
+# ------------------------------------------------------------------
+# Replace asyncio's default event loop with libuv (Linux-only).
+# On async-IO-heavy workloads — WARP-proxied GraphQL fetches, Mongo
+# cache reads/writes, Redis pipeline ops — uvloop typically reduces
+# per-request CPU by 20-40 % vs. the pure-Python asyncio loop.
+# ------------------------------------------------------------------
+try:
+    import uvloop
+    uvloop.install()
+except ImportError:
+    pass  # macOS / Windows dev machine — not a problem
+
 # Multiprocess Prometheus support: each uvicorn worker writes to a shared
 # mmap'd directory. The /metrics endpoint aggregates all workers.
 _MULTIPROC_DIR = os.environ.get("PROMETHEUS_MULTIPROC_DIR")

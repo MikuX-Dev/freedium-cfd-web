@@ -4,14 +4,13 @@ interface RenderResponse {
 	markdown: string;
 	service: string;
 	cache_status?: string;
+	// Set (truthy) ONLY when the backend dispatched a cold render to the
+	// TaskIQ worker and returned {task_id, cache_status:"pending"}. On a
+	// synchronous render / cache hit this is null or absent.
+	task_id?: string | null;
 }
 
-interface TaskRenderResponse {
-	task_id: string;
-	status: string;
-}
-
-type RenderApiResponse = RenderResponse | TaskRenderResponse;
+type RenderApiResponse = RenderResponse;
 
 /**
  * Poll the backend's /render/poll/{taskId} endpoint until the
@@ -65,11 +64,13 @@ export async function render(content: string, frontmatter = false): Promise<Rend
 
 	if (!response) throw new Error("Failed to render content");
 
-	// 202 Accepted = cold cache, TaskIQ worker is rendering.
-	// Poll until the result is ready.
-	if ("task_id" in response && response.status === "pending") {
+	// Cold cache: the backend dispatched the render to the TaskIQ worker
+	// and returned a task_id (with cache_status "pending"). Poll until the
+	// worker's result is ready. A synchronous render / cache hit has no
+	// task_id and is returned directly.
+	if (response.task_id) {
 		return pollTask(response.task_id);
 	}
 
-	return response as RenderResponse;
+	return response;
 }

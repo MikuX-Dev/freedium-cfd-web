@@ -99,7 +99,10 @@ services:
       - "--entrypoints.web.address=:80"
       # Trust X-Forwarded-* from the edge HAProxy + private ranges so
       # SvelteKit sees the real client IP and original https scheme.
-      - "--entrypoints.web.forwardedHeaders.trustedIPs=${EDGE_PROXY_CIDR:-127.0.0.1/32,146.103.108.112/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}"
+      # Narrow default: edge HAProxy + loopback + Docker's default bridge
+      # range only. Operators on other bridge subnets (e.g. user-defined
+      # networks outside 172.16/12) MUST pin EDGE_PROXY_CIDR explicitly.
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=${EDGE_PROXY_CIDR:-127.0.0.1/32,146.103.108.112/32,172.16.0.0/12}"
       - "--entrypoints.metrics.address=:8082"
       - "--providers.file.filename=/etc/traefik/dynamic.yml"
       - "--providers.file.watch=true"

@@ -9,19 +9,22 @@ http:
     # HAProxy at 146.103.108.112 — Traefik only ever sees the canonical
     # domain, so we don't need it in the Host() match.
     web:
-      rule: "Host(`freedium.localhost`, `freedium-mirror.cfd`)"
+      rule: "Host(`freedium.localhost`) || Host(`freedium-mirror.cfd`)"
       entryPoints:
         - web
       service: web
 
     grafana:
-      rule: "Host(`grafana.localhost`, `grafana.freedium-mirror.cfd`)"
+      # Dev-only. Don't expose grafana publicly — access via SSH tunnel.
+      rule: "Host(`grafana.localhost`)"
       entryPoints:
         - web
       service: grafana
 
     dashboard:
-      rule: "Host(`traefik.localhost`, `traefik.freedium-mirror.cfd`)"
+      # Dev-only. The Traefik dashboard exposes the routing table; never
+      # serve it on a public hostname without forwardAuth + IP allowlist.
+      rule: "Host(`traefik.localhost`)"
       entryPoints:
         - web
       service: api@internal

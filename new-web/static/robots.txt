@@ -1,0 +1,11 @@
+User-agent: Yandex
+Allow: /
+Sitemap: https://freedium-mirror.cfd/sitemap.xml
+
+User-agent: Googlebot
+Allow: /
+Sitemap: https://freedium-mirror.cfd/sitemap.xml
+
+User-agent: *
+Allow: /
+Sitemap: https://freedium-mirror.cfd/sitemap.xml

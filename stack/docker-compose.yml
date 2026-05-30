@@ -97,6 +97,9 @@ services:
       - "--api.dashboard=true"
       - "--api.insecure=true"
       - "--entrypoints.web.address=:80"
+      # Trust X-Forwarded-* from the edge HAProxy + private ranges so
+      # SvelteKit sees the real client IP and original https scheme.
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=${EDGE_PROXY_CIDR:-127.0.0.1/32,146.103.108.112/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}"
       - "--entrypoints.metrics.address=:8082"
       - "--providers.file.filename=/etc/traefik/dynamic.yml"
       - "--providers.file.watch=true"
@@ -105,7 +108,10 @@ services:
       - "--accesslog=true"
       - "--accesslog.format=json"
     ports:
-      - "80:80"
+      # Exotic ingress port so the stack runs on a host whose 80/443
+      # are claimed by another proxy (e.g. Coolify). The edge HAProxy
+      # at 146.103.108.112 forwards public 80/443 → <host>:18080.
+      - "${WEB_INGRESS_PORT:-18080}:80"
     volumes:
       - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
     networks:

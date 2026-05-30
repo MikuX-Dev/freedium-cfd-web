@@ -1,19 +1,24 @@
 http:
+  # Production note:
+  # Public traffic enters via the edge HAProxy at 146.103.108.112 which
+  # terminates TLS for freedium.cfd / freedium-mirror.cfd and forwards
+  # plain HTTP to this Traefik on host port 18080. Dev hostnames
+  # (*.localhost) remain so local docker compose up still works.
   routers:
     web:
-      rule: "Host(`freedium.localhost`)"
+      rule: "Host(`freedium.localhost`, `freedium.cfd`, `freedium-mirror.cfd`)"
       entryPoints:
         - web
       service: web
 
     grafana:
-      rule: "Host(`grafana.localhost`)"
+      rule: "Host(`grafana.localhost`, `grafana.freedium.cfd`)"
       entryPoints:
         - web
       service: grafana
 
     dashboard:
-      rule: "Host(`traefik.localhost`)"
+      rule: "Host(`traefik.localhost`, `traefik.freedium.cfd`)"
       entryPoints:
         - web
       service: api@internal

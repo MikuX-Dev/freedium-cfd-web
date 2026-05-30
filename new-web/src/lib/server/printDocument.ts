@@ -1,5 +1,21 @@
 import printStyles from "./printStyles.css?raw";
 import type { ArticleMetadata } from "./articleRenderer";
+import config from "@/config";
+
+/** Freedium URL for a Medium link, so PDF links open the Freedium version. */
+function freediumUrl(mediumUrl: string): string {
+	return `${config.SITE_URL}/${mediumUrl}`;
+}
+
+/** Rewrite in-article links that point at Medium so they open through
+ * Freedium instead — keeps PDF readers on Freedium. Matches medium.com and
+ * its subdomains (e.g. *.medium.com), leaves all other links untouched. */
+function rewriteMediumLinks(html: string): string {
+	return html.replace(
+		/href="(https?:\/\/(?:[a-z0-9-]+\.)*medium\.com\/[^"]+)"/gi,
+		(_m, link) => `href="${config.SITE_URL}/${link}"`,
+	);
+}
 
 function escapeHtml(s: string): string {
     return s
@@ -29,7 +45,7 @@ function renderCover(article: ArticleMetadata): string {
             <div class="cover-meta">
                 <p><strong>${escapeHtml(article.author.name)}</strong></p>
                 ${dateStr ? `<p>${escapeHtml(dateStr)}</p>` : ""}
-                ${article.url ? `<p><a href="${escapeHtml(article.url)}">${escapeHtml(article.url)}</a></p>` : ""}
+                ${article.url ? `<p><a href="${escapeHtml(freediumUrl(article.url))}">Read on Freedium</a> · <a href="${escapeHtml(article.url)}">original</a></p>` : ""}
             </div>
         </div>
     </section>`;
@@ -62,7 +78,7 @@ export function buildPrintDocument(article: ArticleMetadata, contentHtml: string
 ${renderCover(article)}
 ${renderToc(article)}
 <article class="prose-print" data-title="${escapeHtml(article.title)}">
-${contentHtml}
+${rewriteMediumLinks(contentHtml)}
 </article>
 </body>
 </html>`;

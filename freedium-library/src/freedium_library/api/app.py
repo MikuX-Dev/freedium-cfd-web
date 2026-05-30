@@ -26,6 +26,7 @@ from freedium_library.api import metrics as _metrics  # noqa: F401  # registers 
 from freedium_library.api.container import APIContainer
 from freedium_library.api.error import register_error_handler
 from freedium_library.api.handlers import register_router
+from freedium_library.api.handlers.images import register_images_router
 from freedium_library.api.lifespan import lifespan
 from freedium_library.api.middlewares import register_middlewares
 from freedium_library.api.settings import ApplicationSettings
@@ -70,6 +71,8 @@ def create_application() -> FastAPI:
         redoc_url=settings.redoc_url,
         lifespan=lifespan,
     )
+
+    register_images_router(app)
 
     register_router(app, settings.prefix_path, config=config)
 

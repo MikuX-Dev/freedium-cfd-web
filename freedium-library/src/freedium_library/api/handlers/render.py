@@ -29,9 +29,10 @@ class RenderRequest(BaseModel):
 class RenderResponse(BaseModel):
     """Response from render endpoint."""
 
-    markdown: str
-    service: str
+    markdown: str = ""
+    service: str = ""
     cache_status: str = "miss"
+    task_id: str | None = None  # set when render is dispatched to TaskIQ (202)
 
 
 async def _record_recent(
@@ -136,6 +137,31 @@ async def render_universal(
             pass  # treat L2 read failure as a miss
     RENDERED_CACHE_MISSES.inc()
 
+    # Cold render: dispatch to TaskIQ worker so uvicorn workers stay
+    # free for L2-cached requests. The frontend polls /render/poll/
+    # until the worker finishes.
+    from uuid import uuid4
+
+    from freedium_library.tasks.cache import render_article_async
+
+    task_id = str(uuid4())
+    try:
+        await render_article_async.kiq(
+            content=request.content,
+            frontmatter=request.frontmatter,
+            task_id=task_id,
+        )
+    except Exception:
+        # Broker unreachable — fall through to synchronous render
+        pass
+    else:
+        return RenderResponse(  # type: ignore[return-type]
+            markdown="",
+            service="pending",
+            cache_status="pending",
+            task_id=task_id,
+        )
+
     with track_render(ARTICLE_RENDER) as ctx:
         try:
             # Get resolver from app state
@@ -222,6 +248,40 @@ def register_render_router(router: APIRouter) -> None:
         description="Render a Medium post to Markdown format (legacy endpoint)",
         tags=["render"],
         response_class=PlainTextResponse,
+    )
+
+    # TaskIQ render poll endpoint — the frontend calls this after
+    # receiving 202 {task_id} from render_universal.
+    async def _poll_render_task(task_id: str):
+        import os as _poll_os
+
+        from redis.asyncio import Redis
+
+        r = Redis.from_url(
+            _poll_os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
+            decode_responses=True,
+        )
+        try:
+            import json as _json
+
+            raw = await r.get(f"freedium:render:{task_id}")
+            if raw is None:
+                raise HTTPException(status_code=404, detail="Task not found")
+            return _json.loads(raw)
+        finally:
+            await r.aclose()
+
+    render_router.add_api_route(
+        "/poll/{task_id}",
+        endpoint=_poll_render_task,
+        methods=["GET"],
+        summary="Poll a background render task",
+        description=(
+            "Called by the frontend while waiting for a TaskIQ-dispatched "
+            "cold-cache render. Returns {status:'pending'} until the worker "
+            "finishes, then {markdown,service,status:'done'} or {status:'error'}."
+        ),
+        tags=["render"],
     )
 
     router.include_router(render_router)

@@ -23,6 +23,7 @@
 
   // If the Medium CDN image 404s/blocks, fall back to the placeholder.
   let imgFailed = $state(false);
+  let imgLoaded = $state(false);
 
   const palettes = ['ph-warm', 'ph-cool', 'ph-green', 'ph-rose', 'ph-violet', 'ph-sand'];
   const phTags = [
@@ -71,17 +72,24 @@
     <article class="card" class:feat={isFeatured}>
       <div class={thumbClass}>
         {#if imageUrl && !imgFailed}
+          <!-- Image fades in on load; a pulsing skeleton shows underneath
+               while it loads, and stays (instead of a broken-image/alt)
+               if it never loads. -->
           <img
             class="thumb-img"
+            class:loaded={imgLoaded}
             src={imageUrl}
-            alt={title}
+            alt=""
             loading="lazy"
+            onload={() => (imgLoaded = true)}
             onerror={() => (imgFailed = true)}
           />
+          {#if !imgLoaded}
+            <div class="thumb-pulse" aria-hidden="true"></div>
+          {/if}
         {:else}
-          <div class="thumb-ph {phClass}">
-            <div class="ph-tag">{phTag}</div>
-          </div>
+          <!-- No image URL, or it errored: pulsing placeholder, not alt text. -->
+          <div class="thumb-pulse" aria-hidden="true"></div>
         {/if}
         {#if isFeatured}
           <span class="badge"><span class="badge-dot"></span>Featured</span>
@@ -161,6 +169,21 @@
     height: 100%;
     object-fit: cover;
     display: block;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .thumb-img.loaded { opacity: 1; }
+
+  /* Pulsing skeleton shown while the cover loads (and kept on error). */
+  .thumb-pulse {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-3);
+    animation: thumb-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes thumb-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.45; }
   }
 
   .thumb-ph {

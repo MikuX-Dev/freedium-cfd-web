@@ -26,17 +26,28 @@ class _FakeBackend:
         self.put_calls.append((key, data, content_type))
 
 
-class _FakeResponse:
+class _FakeStream:
+    """Stand-in for the object returned by httpx.AsyncClient.stream(...)."""
+
     def __init__(self, status_code: int, content: bytes, content_type: str):
         self.status_code = status_code
-        self.content = content
-        self.headers = {"content-type": content_type}
+        self._content = content
+        self.headers = {"content-type": content_type, "content-length": str(len(content))}
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def aiter_bytes(self):
+        yield self._content
 
 
 class _FakeAsyncClient:
-    """Stand-in for httpx.AsyncClient returning a canned response."""
+    """Stand-in for httpx.AsyncClient whose .stream() yields a canned body."""
 
-    response: _FakeResponse | None = None
+    response: _FakeStream | None = None
     requested_urls: list[str] = []
 
     def __init__(self, *args, **kwargs):
@@ -48,7 +59,7 @@ class _FakeAsyncClient:
     async def __aexit__(self, *exc):
         return False
 
-    async def get(self, url: str):
+    def stream(self, method: str, url: str):
         _FakeAsyncClient.requested_urls.append(url)
         assert _FakeAsyncClient.response is not None
         return _FakeAsyncClient.response
@@ -86,7 +97,7 @@ def test_cache_miss_fetches_stores_and_returns(monkeypatch):
     backend = _FakeBackend(get_result=None)
     monkeypatch.setattr(images, "_get_backend", lambda: backend)
 
-    _FakeAsyncClient.response = _FakeResponse(200, b"JPEGDATA", "image/jpeg")
+    _FakeAsyncClient.response = _FakeStream(200, b"JPEGDATA", "image/jpeg")
     _FakeAsyncClient.requested_urls = []
     monkeypatch.setattr(images.httpx, "AsyncClient", _FakeAsyncClient)
 
@@ -95,6 +106,7 @@ def test_cache_miss_fetches_stores_and_returns(monkeypatch):
     assert res.content == b"JPEGDATA"
     assert res.headers["content-type"] == "image/jpeg"
     assert res.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert res.headers["x-content-type-options"] == "nosniff"
 
     # Fetched from the hardcoded Medium upstream.
     assert _FakeAsyncClient.requested_urls == [
@@ -102,3 +114,17 @@ def test_cache_miss_fetches_stores_and_returns(monkeypatch):
     ]
     # Stored under "{width}:{image_id}" with the upstream content-type.
     assert backend.put_calls == [("700:0*abc", b"JPEGDATA", "image/jpeg")]
+
+
+def test_svg_content_type_is_rejected(monkeypatch):
+    """An image/svg+xml upstream must NOT be served (stored-XSS guard)."""
+    backend = _FakeBackend(get_result=None)
+    monkeypatch.setattr(images, "_get_backend", lambda: backend)
+
+    _FakeAsyncClient.response = _FakeStream(200, b"<svg onload=alert(1)>", "image/svg+xml")
+    _FakeAsyncClient.requested_urls = []
+    monkeypatch.setattr(images.httpx, "AsyncClient", _FakeAsyncClient)
+
+    res = _client().get("/img/700/0*abc")
+    assert res.status_code == 502
+    assert backend.put_calls == []  # never cached

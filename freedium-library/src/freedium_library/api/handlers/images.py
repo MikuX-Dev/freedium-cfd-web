@@ -22,9 +22,29 @@ _ALLOWED_WIDTHS = {700, 800, 1400, 2000, 4000}
 # Medium image ids: alphanumeric, '*', '.', '-', '_'. Never a slash/scheme.
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._*-]{0,200}$")
 _MAX_BYTES = 15 * 1024 * 1024  # don't cache images larger than ~15MB
-_CACHE_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+# Strict raster allowlist. We serve these bytes from OUR origin, so an
+# image/svg+xml (which can carry <script>) would be stored XSS on our
+# domain. Only allow inert raster types; reject everything else.
+_SAFE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}
+
+# nosniff + inline + immutable. nosniff stops the browser from
+# re-interpreting bytes as a different (scriptable) type.
+_RESP_HEADERS = {
+    "Cache-Control": "public, max-age=31536000, immutable",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Disposition": "inline",
+}
+
+_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/146 Safari/537.36"
 
 _backend: ImageCacheBackend | None = None
+
+
+def _safe_type(raw: str) -> str | None:
+    """Return the allowlisted content-type, or None if not a safe raster type."""
+    ct = (raw or "").split(";")[0].strip().lower()
+    return ct if ct in _SAFE_TYPES else None
 
 
 def _get_backend() -> ImageCacheBackend:
@@ -61,34 +81,51 @@ def register_images_router(app: FastAPI) -> None:
 
         if cached is not None:
             data, content_type = cached
-            return Response(content=data, media_type=content_type, headers=_CACHE_HEADERS)
+            # Stored types are already allowlisted, but normalize defensively.
+            safe = _safe_type(content_type) or "image/jpeg"
+            return Response(content=data, media_type=safe, headers=_RESP_HEADERS)
 
-        # Miss → fetch from Medium CDN (host hardcoded; via WARP if configured)
+        # Miss → fetch from Medium CDN. Host is hardcoded and redirects are
+        # NOT followed (an off-host 3xx would be an SSRF vector). Body is
+        # streamed with a hard byte cap to bound memory.
         upstream = f"https://miro.medium.com/v2/resize:fit:{width}/{image_id}"
         try:
             async with httpx.AsyncClient(
                 proxy=_proxy(),
                 timeout=25.0,
-                follow_redirects=True,
-                headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/146 Safari/537.36"},
+                follow_redirects=False,
+                headers={"User-Agent": _UA},
             ) as client:
-                resp = await client.get(upstream)
+                async with client.stream("GET", upstream) as resp:
+                    if resp.status_code != 200:
+                        code = resp.status_code if resp.status_code in (403, 404) else 502
+                        raise HTTPException(status_code=code, detail="upstream error")
+
+                    content_type = _safe_type(resp.headers.get("content-type", ""))
+                    if content_type is None:
+                        raise HTTPException(status_code=502, detail="unsupported image type")
+
+                    declared = resp.headers.get("content-length")
+                    if declared is not None and declared.isdigit() and int(declared) > _MAX_BYTES:
+                        raise HTTPException(status_code=502, detail="image too large")
+
+                    chunks: list[bytes] = []
+                    total = 0
+                    async for chunk in resp.aiter_bytes():
+                        total += len(chunk)
+                        if total > _MAX_BYTES:
+                            raise HTTPException(status_code=502, detail="image too large")
+                        chunks.append(chunk)
+                    data = b"".join(chunks)
+        except HTTPException:
+            raise  # preserve the specific status (400/404/502/...)
         except Exception as exc:
             logger.warning(f"image fetch failed for {key}: {exc!r}")
             raise HTTPException(status_code=502, detail="upstream image fetch failed")
 
-        if resp.status_code != 200:
-            raise HTTPException(status_code=resp.status_code if resp.status_code in (404, 403) else 502, detail="upstream error")
+        try:
+            await backend.aput(key, data, content_type)
+        except Exception as exc:  # cache write failure must not break the response
+            logger.warning(f"image_cache write failed for {key}: {exc!r}")
 
-        data = resp.content
-        content_type = resp.headers.get("content-type", "image/jpeg")
-        if not content_type.startswith("image/"):
-            raise HTTPException(status_code=502, detail="not an image")
-
-        if len(data) <= _MAX_BYTES:
-            try:
-                await backend.aput(key, data, content_type)
-            except Exception as exc:  # cache write failure must not break the response
-                logger.warning(f"image_cache write failed for {key}: {exc!r}")
-
-        return Response(content=data, media_type=content_type, headers=_CACHE_HEADERS)
+        return Response(content=data, media_type=content_type, headers=_RESP_HEADERS)

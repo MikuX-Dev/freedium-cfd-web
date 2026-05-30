@@ -443,12 +443,10 @@ class MediumMarkdownRenderer:
         - 'width': Width for HTML attributes
         - 'height': Height for HTML attributes
         """
-        base_url = "https://miro.medium.com/v2/resize:fit"
-
         urls: dict[str, int | str] = {
-            "medium": f"{base_url}:700/{image_id}",
-            "original": f"{base_url}:2000/{image_id}",
-            "zoom": f"{base_url}:4000/{image_id}",
+            "medium": f"/img/700/{image_id}",
+            "original": f"/img/2000/{image_id}",
+            "zoom": f"/img/4000/{image_id}",
         }
 
         # Store dimensions for HTML attributes (prevent Cumulative Layout Shift)

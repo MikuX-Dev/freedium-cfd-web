@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import os
+import re
 from typing import Final
 
 import httpx
@@ -19,6 +21,27 @@ from lxml import html as lxml_html
 _TIMEOUT: Final = httpx.Timeout(connect=3.0, read=8.0, write=3.0, pool=3.0)
 _MAX_IMAGE_BYTES: Final = 5_000_000
 _MAX_PARALLEL: Final = 16
+
+# Article HTML now emits relative /img/{width}/{id} URLs (our cached proxy)
+# instead of direct miro.medium.com links. WeasyPrint can't resolve a
+# relative URL, so map it back to the upstream miro CDN URL for fetching.
+_IMG_PROXY_RE: Final = re.compile(r"^/img/(\d+)/(.+)$")
+
+
+def _fetch_url_for_src(src: str) -> str | None:
+    """Return an absolute URL to fetch for a given <img src>, or None to skip.
+
+    Handles both the legacy direct miro URLs and the new relative
+    /img/{width}/{id} proxy form (reconstructed into the equivalent
+    miro.medium.com resize URL).
+    """
+    if src.startswith(("http://", "https://")):
+        return src
+    m = _IMG_PROXY_RE.match(src)
+    if m:
+        width, image_id = m.group(1), m.group(2)
+        return f"https://miro.medium.com/v2/resize:fit:{width}/{image_id}"
+    return None
 
 # 1x1 transparent SVG for failed/oversize fetches.
 _PLACEHOLDER_DATA_URI: Final = (
@@ -61,26 +84,38 @@ async def inline_images(html_str: str) -> str:
         return html_str
     tree = lxml_html.fragment_fromstring(html_str, create_parent="div")  # type: ignore[arg-type]
 
-    urls: set[str] = set()
+    # Map each inlinable <img src> to the absolute URL we must fetch.
+    # Legacy miro URLs fetch as-is; new /img/{w}/{id} proxy URLs are
+    # reconstructed into their upstream miro CDN equivalent.
+    src_to_fetch: dict[str, str] = {}
     for img in tree.iter("img"):
         src = img.get("src")
-        if src and src.startswith(("http://", "https://")):
-            urls.add(src)
+        if not src or src in src_to_fetch:
+            continue
+        fetch_url = _fetch_url_for_src(src)
+        if fetch_url is not None:
+            src_to_fetch[src] = fetch_url
 
-    if not urls:
+    if not src_to_fetch:
         return html_str
 
+    fetch_urls = list(set(src_to_fetch.values()))
+
+    # Route reconstructed miro fetches through the same Warp/HAProxy chain the
+    # backend uses (so miro.medium.com sees a Cloudflare IP). Direct when unset.
+    proxy_url = os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None
+
     sem = asyncio.Semaphore(_MAX_PARALLEL)
-    async with httpx.AsyncClient(follow_redirects=True) as client:
+    async with httpx.AsyncClient(follow_redirects=True, proxy=proxy_url) as client:
         results = await asyncio.gather(
-            *(_fetch_one(client, u, sem) for u in urls)
+            *(_fetch_one(client, u, sem) for u in fetch_urls)
         )
-    mapping = dict(zip(urls, results))
+    fetch_to_data = dict(zip(fetch_urls, results))
 
     for img in tree.iter("img"):
         src = img.get("src")
-        if src in mapping:
-            img.set("src", mapping[src])
+        if src in src_to_fetch:
+            img.set("src", fetch_to_data[src_to_fetch[src]])
 
     # fragment_fromstring wrapped us in a <div>; serialize children only.
     parts: list[str] = [

@@ -83,3 +83,25 @@ async def test_relative_and_data_urls_left_alone():
     out = await inline_images(html)
     assert "/local.png" in out
     assert "data:image/png;base64,AA==" in out
+
+
+@pytest.mark.asyncio
+async def test_inlines_img_proxy_url(httpx_mock, monkeypatch):
+    """New /img/{width}/{id} proxy URLs are reconstructed to the miro CDN URL,
+    fetched, and inlined as data: URIs (so WeasyPrint stays self-contained)."""
+    monkeypatch.delenv("PROXY_LIST", raising=False)
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+    # /img/700/abc123 -> https://miro.medium.com/v2/resize:fit:700/abc123
+    httpx_mock.add_response(
+        url="https://miro.medium.com/v2/resize:fit:700/abc123",
+        content=png_bytes,
+        headers={"content-type": "image/png"},
+    )
+
+    html_in = '<img src="/img/700/abc123" alt="proxied">'
+    out = await inline_images(html_in)
+
+    expected_b64 = base64.b64encode(png_bytes).decode("ascii")
+    assert f"data:image/png;base64,{expected_b64}" in out
+    assert "/img/700/abc123" not in out
+    assert 'alt="proxied"' in out

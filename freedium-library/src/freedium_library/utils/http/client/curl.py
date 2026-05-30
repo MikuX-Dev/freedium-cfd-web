@@ -26,19 +26,29 @@ class CurlRequest(AbstractRequest):
             stacklevel=2,
         )
 
+    @property
+    def _proxies(self) -> Optional[Dict[str, str]]:
+        # curl_cffi accepts a proxies dict keyed by scheme. We mirror the
+        # same URL into both http/https so SOCKS5 proxies (which front both)
+        # work without the caller having to think about it.
+        if self.config.proxy is None:
+            return None
+        url = self.config.proxy.url
+        return {"http": url, "https": url}
+
     def _get_session(self) -> Any:
         if not self._session:
-            self._session = Session(impersonate=self._impersonate, http_version=self._http_version)
+            self._session = Session(impersonate=self._impersonate, http_version=self._http_version, proxies=self._proxies)
         return self._session
 
     async def _get_async_session(self) -> Any:
         if not self._async_session:
-            self._async_session = AsyncSession(impersonate=self._impersonate, http_version=self._http_version)
+            self._async_session = AsyncSession(impersonate=self._impersonate, http_version=self._http_version, proxies=self._proxies)
         return self._async_session
 
     def __enter__(self) -> "CurlRequest":
         self._in_context_manager = True
-        self._session = Session(impersonate=self._impersonate, http_version=self._http_version)
+        self._session = Session(impersonate=self._impersonate, http_version=self._http_version, proxies=self._proxies)
         return self
 
     def __exit__(
@@ -53,7 +63,7 @@ class CurlRequest(AbstractRequest):
 
     async def __aenter__(self) -> "CurlRequest":
         self._in_context_manager = True
-        self._async_session = AsyncSession(impersonate=self._impersonate, http_version=self._http_version)
+        self._async_session = AsyncSession(impersonate=self._impersonate, http_version=self._http_version, proxies=self._proxies)
         return self
 
     async def __aexit__(

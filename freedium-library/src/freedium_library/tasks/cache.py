@@ -69,7 +69,11 @@ async def embed_images_in_cache(url: str, markdown: str, service: str) -> None:
         if not urls:
             return
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        # Route image fetches through the same Warp/HAProxy chain that the
+        # backend uses so miro.medium.com sees a Cloudflare IP, not the
+        # host's. Falls back to direct when PROXY_LIST is unset (dev).
+        proxy_url = (os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None)
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, proxy=proxy_url) as client:
             async def fetch_one(img_url: str) -> tuple[str, str | None]:
                 try:
                     resp = await client.get(img_url)

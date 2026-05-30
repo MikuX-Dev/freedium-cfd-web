@@ -1,6 +1,46 @@
 name: freedium-obs
 
 services:
+  wgcf:
+    build:
+      context: ./wgcf-warp
+    deploy:
+      replicas: 3
+    networks:
+      - freedium_obs_net
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      # Needed so `modprobe wireguard` / `ip6table_raw` inside the container
+      # can find the host's kernel modules — without this wg-quick fails to
+      # bring the wgcf interface up.
+      - /lib/modules:/lib/modules:ro
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs --max-time 3 https://www.cloudflare.com/cdn-cgi/trace | grep -q -E 'warp=(on|plus)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  haproxy-pb:
+    build:
+      context: ../proxy-balancer
+    depends_on:
+      wgcf:
+        # service_started (not service_healthy) so the stack still comes up
+        # in environments where Warp's UDP handshake completes but data
+        # plane is throttled (e.g. some ISPs filter Cloudflare WARP return
+        # traffic). HAProxy itself has `check` on each backend slot so it
+        # routes only to replicas actually answering.
+        condition: service_started
+    networks:
+      - freedium_obs_net
+    restart: unless-stopped
+
   backend:
     build:
       context: ..
@@ -16,6 +56,7 @@ services:
       - MONGO_COLLECTION=${MONGO_COLLECTION:-post_cache}
       - REDIS_URL=redis://redis:6379/0
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+      - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
     volumes:
       - errored_logs:/var/log/freedium
     depends_on:
@@ -23,6 +64,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      haproxy-pb:
+        condition: service_started
     networks:
       - freedium_obs_net
     restart: unless-stopped
@@ -95,6 +138,7 @@ services:
       - MONGO_COLLECTION=${MONGO_COLLECTION:-post_cache}
       - CACHE_ENABLED=${CACHE_ENABLED:-true}
       - ERROR_LOG_PATH=/var/log/freedium/errored-links.jsonl
+      - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
     volumes:
       - errored_logs:/var/log/freedium
     depends_on:
@@ -102,6 +146,8 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+      haproxy-pb:
+        condition: service_started
     networks:
       - freedium_obs_net
     restart: unless-stopped

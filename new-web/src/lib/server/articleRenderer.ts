@@ -43,9 +43,13 @@ const externalLinkIcon = getIconHast("arrow-top-right-on-square", {
 	"aria-hidden": "true",
 });
 
+// Load every bundled shiki language so Medium code blocks in ANY
+// language (kotlin, markdown, java, css, etc.) don't crash the SSR.
+import { bundledLanguages } from "shiki";
+
 const HIGHLIGHT_CONFIG = {
 	themes: ["github-light", "github-dark"],
-	langs: ["javascript", "typescript", "nginx", "bash", "ruby", "python"],
+	langs: Object.keys(bundledLanguages),
 };
 
 const CODE_ATTRIBUTES: Record<string, string> = {
@@ -71,7 +75,7 @@ let highlighterInstance: HighlighterGeneric<BundledLanguage, BundledTheme> | nul
 async function getHighlighter(): Promise<HighlighterGeneric<BundledLanguage, BundledTheme>> {
 	if (!highlighterInstance) {
 		highlighterInstance = await createHighlighter(HIGHLIGHT_CONFIG);
-		await highlighterInstance.loadLanguage("javascript", "typescript", "nginx", "bash", "ruby", "python");
+		await highlighterInstance.loadLanguage(...Object.keys(bundledLanguages));
 	}
 	return highlighterInstance;
 }

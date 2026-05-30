@@ -41,11 +41,13 @@ const EDITORIAL_CARDS: { position: number; post: Omit<BlogPost, "id"> }[] = [
 	},
 ];
 
-/** Build a Medium CDN URL for a preview image id. The browser fetches
- * these directly (client-side) — they're public CDN assets, so no WARP
- * proxy is involved. Featured cards get a larger width. */
+/** Build a cover-image URL routed through our own /img proxy+cache
+ * instead of hitting Medium's CDN directly. The browser loads from our
+ * domain (Traefik → backend → Mongo image_cache → WARP on miss), so it
+ * never contacts Medium. Width must be in the backend's allowlist
+ * (700/800/1400/2000/4000). Featured cards get a larger width. */
 function mediumImageUrl(imageId: string, width: number): string {
-	return `https://miro.medium.com/v2/resize:fit:${width}/${imageId}`;
+	return `/img/${width}/${imageId}`;
 }
 
 function toBlogPost(p: RecentPost, index: number): Omit<BlogPost, "id"> {

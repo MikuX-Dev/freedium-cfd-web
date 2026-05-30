@@ -8,6 +8,17 @@ http:
     # freedium.cfd is 301-redirected to freedium-mirror.cfd by the edge
     # HAProxy at 146.103.108.112 — Traefik only ever sees the canonical
     # domain, so we don't need it in the Host() match.
+    # Image proxy: /img/{width}/{id} is served by the backend (Mongo
+    # image_cache + WARP-on-miss), NOT the SvelteKit web tier. Higher
+    # priority than `web` so it wins on the /img/ prefix; everything
+    # else still falls through to web. Backend stays otherwise internal.
+    images:
+      rule: "(Host(`freedium.localhost`) || Host(`freedium-mirror.cfd`)) && PathPrefix(`/img/`)"
+      priority: 100
+      entryPoints:
+        - web
+      service: backend
+
     web:
       rule: "Host(`freedium.localhost`) || Host(`freedium-mirror.cfd`)"
       entryPoints:
@@ -34,6 +45,11 @@ http:
       loadBalancer:
         servers:
           - url: "http://web:3000"
+
+    backend:
+      loadBalancer:
+        servers:
+          - url: "http://backend:7080"
 
     grafana:
       loadBalancer:

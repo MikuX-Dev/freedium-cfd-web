@@ -22,7 +22,11 @@ class RequestProxyConfig:
 
 @dataclass
 class RequestConfig:
-    timeout: int = 6
-    retries: int = 3
+    # WARP proxy adds ~5-15s latency to the GraphQL hop. 20s gives
+    # enough runway for a typical Medium response through the tunnel
+    # while still failing before the uvicorn keepalive/sveltekit fetch
+    # timeout (120s). Lower this if you see workers piling up.
+    timeout: int = 20
+    retries: int = 1  # don't compound the timeout — one shot is enough
     proxy: Optional[RequestProxyConfig] = None
     # backoff_factor: float = 0.1 # not possible. Default value: 0.5. https://github.com/encode/httpx/discussions/1895

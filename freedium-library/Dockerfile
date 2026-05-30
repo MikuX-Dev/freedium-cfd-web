@@ -101,4 +101,7 @@ EXPOSE 7080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:7080/healthz > /dev/null || exit 1
 
+# Production: 12 workers gives enough headroom that cached articles (which
+# are instant L2 hits) still get served while slower WARP-proxied GraphQL
+# requests occupy other workers. Tune down for smaller boxes.
 CMD ["uvicorn", "freedium_library.api.app:app", "--host", "0.0.0.0", "--port", "7080", "--workers", "4", "--log-level", "warning"]

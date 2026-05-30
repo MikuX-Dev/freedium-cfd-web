@@ -76,6 +76,26 @@ async function getHighlighter(): Promise<HighlighterGeneric<BundledLanguage, Bun
 	return highlighterInstance;
 }
 
+/** codeToHtml wrapper that falls back to "text" for unsupported languages.
+ * Medium articles can contain code blocks in any language — kotlin, java,
+ * markdown, css, etc. — but we only pre-load a handful. This keeps the
+ * render pipeline from crashing on unknown languages. */
+function safeCodeToHtml(
+	highlighter: HighlighterGeneric<BundledLanguage, BundledTheme>,
+	code: string,
+	lang: string,
+	options: Record<string, unknown>,
+): string {
+	try {
+		return highlighter.codeToHtml(code, { ...options, lang } as Parameters<typeof highlighter.codeToHtml>[1]);
+	} catch (e) {
+		if (e instanceof Error && (e.name === "ShikiError" || e.message?.includes("Language"))) {
+			return highlighter.codeToHtml(code, { ...options, lang: "text" } as Parameters<typeof highlighter.codeToHtml>[1]);
+		}
+		throw e;
+	}
+}
+
 function createCodeCopyButton(code: string, toggleMs: number = 3000): string {
 	const lineCount = code.split("\n").length;
 	const positionClass = lineCount <= 3 ? "top-1/2 -translate-y-1/2" : "top-3";
@@ -151,8 +171,8 @@ function rehypeHighlight(opts: { mode: RenderMode } = { mode: "web" }) {
 
 
 					// Generate highlighted HTML with decorations
-					const lightHtml = highlighter.codeToHtml(codeText, {
-						lang,
+					const lightHtml = safeCodeToHtml(highlighter, codeText, lang, {
+
 						theme: "github-light",
 						decorations,
 						transformers: [
@@ -171,8 +191,8 @@ function rehypeHighlight(opts: { mode: RenderMode } = { mode: "web" }) {
 						wrappedHtml = lightHtml;
 					} else {
 						// Web: dual theme + copy button (existing behavior).
-						const darkHtml = highlighter.codeToHtml(codeText, {
-							lang,
+						const darkHtml = safeCodeToHtml(highlighter, codeText, lang, {
+	
 							theme: "github-dark",
 							decorations,
 							transformers: [

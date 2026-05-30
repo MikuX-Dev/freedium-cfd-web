@@ -11,14 +11,6 @@
 
   let activeFilter = $state('Latest');
   const filters = ['Latest', 'Trending', 'This week', 'Long reads', 'Following'];
-
-  // Resolved by {#await ... :then result} below; defaults for the skeleton phase.
-  let resolved = $state<{
-    items: BlogPost[];
-    randomItems: BlogPost[];
-    isFeedEmpty: boolean;
-    backendError: string | null;
-  }>({ items: [], randomItems: [], isFeedEmpty: false, backendError: null });
 </script>
 
 <svelte:head>
@@ -46,7 +38,6 @@
 </div>
 
 {#await data.streamed}
-  <!-- SKELETON — renders instantly in the first HTML chunk -->
   <div class="feed">
     {#each Array(6) as _}
       <div class="skeleton-card">
@@ -58,10 +49,7 @@
     {/each}
   </div>
 {:then result}
-  <!-- RESOLVED — streams in when the backend responds -->
-  {@const _ = (resolved = result)}
-  {@const displayItems = activeFilter === 'Trending' ? result.randomItems : result.items}
-
+  {@const displayItems = (activeFilter === 'Trending' ? result.randomItems : result.items) ?? []}
   {#if result.isFeedEmpty}
     <div class="empty-state">
       <div class="empty-mark">&empty;</div>

@@ -78,10 +78,6 @@ function interleave(
 }
 
 export const load: PageServerLoad = async () => {
-	// Stream posts: start fetching immediately but don't block the page.
-	// SvelteKit unwraps the promise and streams the resolved data — the
-	// hero + header render instantly (<100 ms TTFB), then the feed cards
-	// replace the skeleton when the backend API responds.
 	const streamed = Promise.all([
 		recentPosts(FEED_LIMIT).catch(() => [] as RecentPost[]),
 		randomPosts(FEED_LIMIT).catch(() => [] as RecentPost[]),
@@ -101,13 +97,12 @@ export const load: PageServerLoad = async () => {
 			backendError: null as string | null,
 		};
 	}).catch((err) => {
-		const msg = err instanceof Error ? err.message : "unknown error";
-		console.warn("Failed to fetch posts:", msg);
+		console.warn("Failed to fetch posts:", err);
 		return {
 			items: [] as BlogPost[],
 			randomItems: [] as BlogPost[],
 			isFeedEmpty: true,
-			backendError: msg,
+			backendError: (err as Error)?.message ?? "unknown",
 		};
 	});
 

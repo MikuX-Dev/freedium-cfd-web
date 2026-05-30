@@ -48,6 +48,13 @@
 		if (!data.slug) return;
 		const link = document.createElement('a');
 		link.href = articleDownloadUrl(data.slug);
+		// /api/download is a +server.ts API route, not a +page. Without these,
+		// SvelteKit's client router hijacks the click and tries to fetch
+		// /api/download/__data.json (which 404s) instead of downloading.
+		// The download attribute + reload opt-out force a real browser
+		// navigation so the Content-Disposition response downloads.
+		link.download = '';
+		link.setAttribute('data-sveltekit-reload', '');
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);

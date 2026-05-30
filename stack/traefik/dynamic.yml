@@ -5,20 +5,23 @@ http:
   # plain HTTP to this Traefik on host port 18080. Dev hostnames
   # (*.localhost) remain so local docker compose up still works.
   routers:
+    # freedium.cfd is 301-redirected to freedium-mirror.cfd by the edge
+    # HAProxy at 146.103.108.112 — Traefik only ever sees the canonical
+    # domain, so we don't need it in the Host() match.
     web:
-      rule: "Host(`freedium.localhost`, `freedium.cfd`, `freedium-mirror.cfd`)"
+      rule: "Host(`freedium.localhost`, `freedium-mirror.cfd`)"
       entryPoints:
         - web
       service: web
 
     grafana:
-      rule: "Host(`grafana.localhost`, `grafana.freedium.cfd`)"
+      rule: "Host(`grafana.localhost`, `grafana.freedium-mirror.cfd`)"
       entryPoints:
         - web
       service: grafana
 
     dashboard:
-      rule: "Host(`traefik.localhost`, `traefik.freedium.cfd`)"
+      rule: "Host(`traefik.localhost`, `traefik.freedium-mirror.cfd`)"
       entryPoints:
         - web
       service: api@internal

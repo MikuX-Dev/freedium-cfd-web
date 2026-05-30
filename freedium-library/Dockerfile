@@ -101,7 +101,7 @@ EXPOSE 7080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:7080/healthz > /dev/null || exit 1
 
-# Production: 12 workers gives enough headroom that cached articles (which
-# are instant L2 hits) still get served while slower WARP-proxied GraphQL
-# requests occupy other workers. Tune down for smaller boxes.
+# 4 workers on the 4-vCPU box. Cold renders are dispatched to the TaskIQ
+# worker (see render_universal), so uvicorn workers stay free for the
+# fast L2-cached path rather than blocking on WARP-proxied GraphQL.
 CMD ["uvicorn", "freedium_library.api.app:app", "--host", "0.0.0.0", "--port", "7080", "--workers", "4", "--log-level", "warning"]

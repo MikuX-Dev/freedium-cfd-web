@@ -170,44 +170,50 @@ class MediumApiService:
 
         logger.debug("GraphQL request started...")
 
-        response = None
+        # Retry transient WARP/Medium failures. Three distinct failure modes
+        # observed in production, all transient (recover on a later attempt):
+        #   1. status 0 / connection reset through the WARP SOCKS tunnel
+        #   2. non-200 status
+        #   3. HTTP 200 but data.post == null — Medium soft-blocking the shared
+        #      WARP exit IP (it returns null instead of 429)
+        # Intermediate attempts log at DEBUG; we only ERROR once all attempts
+        # are exhausted, and INFO when a retry recovers — so a successful
+        # render never leaves a scary WARNING/ERROR behind.
+        last_reason = "no response"
         for attempt in range(3):
             try:
                 async with self.request as request:
                     response = await request.apost(url, headers=headers, data=graphql_data)
-                if response.status_code == 200:
-                    break
-                logger.warning(
-                    f"GraphQL attempt {attempt + 1}/3 for {post_id}: status {response.status_code}"
-                )
+                if response.status_code != 200:
+                    last_reason = f"status {response.status_code}"
+                else:
+                    try:
+                        parsed = JSON.loads(response.text)
+                    except Exception as ex:
+                        parsed = None
+                        last_reason = f"invalid JSON ({ex})"
+                    if parsed is not None and ((parsed.get("data") or {}).get("post")) is not None:
+                        response_data = parsed
+                        if attempt > 0:
+                            logger.info(
+                                f"GraphQL for {post_id} recovered on attempt {attempt + 1}/3"
+                            )
+                        break
+                    elif parsed is not None:
+                        last_reason = "HTTP 200 with null post (Medium soft-block)"
             except Exception as ex:  # connection-level failure through WARP, etc.
-                logger.warning(f"GraphQL attempt {attempt + 1}/3 for {post_id} failed: {ex!r}")
-                response = None
+                last_reason = f"{type(ex).__name__}: {ex}"
+            logger.debug(f"GraphQL attempt {attempt + 1}/3 for {post_id}: {last_reason}")
             if attempt < 2:
                 await asyncio.sleep(_GRAPHQL_RETRY_BACKOFFS[attempt])
 
-        if response is None or response.status_code != 200:
-            detail = (
-                f"\nStatus code: {response.status_code}\nResponse: {response.text[:500]}"
-                if response is not None
-                else " (no response / connection error)"
+        if response_data is None:
+            logger.error(
+                f"Failed to fetch post by ID {post_id} after 3 attempts ({last_reason})"
             )
-            logger.error(f"Failed to fetch post by ID {post_id} after 3 attempts{detail}")
             return None
 
         logger.debug("GraphQL request finished...")
-
-        # response is a 200 here — parse it (UNCHANGED downstream logic)
-        try:
-            response_data = JSON.loads(response.text)
-        except Exception as ex:
-            logger.error(f"Failed to parse response as JSON: {ex}")
-            logger.debug(f"Response text: {response.text[:500]}")
-            raise
-
-        if response_data is None:
-            logger.warning(f"Response data is None for post {post_id}")
-            return None
 
         # Resolve __ref references in the response data before Pydantic parsing
         # This ensures mediaResource references in iframes are properly resolved

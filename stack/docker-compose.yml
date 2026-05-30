@@ -240,6 +240,16 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:-admin}
       - GF_USERS_DEFAULT_THEME=dark
       - GF_AUTH_ANONYMOUS_ENABLED=${GF_ANON_ENABLED:-false}
+      # Grafana is served under /grafana via an SSH tunnel, so tell it
+      # its served-from path and let it serve from a sub-path.
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+    # Bind to 127.0.0.1 ONLY on the host — never publicly reachable.
+    # Operators open it locally with an SSH tunnel:
+    #   ssh -L 3001:127.0.0.1:3001 root@95.216.173.21
+    # then browse http://localhost:3001 (login: admin / GF_ADMIN_PASSWORD).
+    ports:
+      - "127.0.0.1:${GRAFANA_LOCAL_PORT:-3001}:3000"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro

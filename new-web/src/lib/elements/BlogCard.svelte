@@ -7,6 +7,7 @@
     id,
     title,
     excerpt,
+    imageUrl = undefined,
     size = 'medium',
     readingTime,
     publishedAt,
@@ -19,6 +20,9 @@
     statLabel = '',
     statDesc = '',
   }: Props = $props();
+
+  // If the Medium CDN image 404s/blocks, fall back to the placeholder.
+  let imgFailed = $state(false);
 
   const palettes = ['ph-warm', 'ph-cool', 'ph-green', 'ph-rose', 'ph-violet', 'ph-sand'];
   const phTags = [
@@ -66,9 +70,19 @@
   <a href={`/${slug}`} class="card-link">
     <article class="card" class:feat={isFeatured}>
       <div class={thumbClass}>
-        <div class="thumb-ph {phClass}">
-          <div class="ph-tag">{phTag}</div>
-        </div>
+        {#if imageUrl && !imgFailed}
+          <img
+            class="thumb-img"
+            src={imageUrl}
+            alt={title}
+            loading="lazy"
+            onerror={() => (imgFailed = true)}
+          />
+        {:else}
+          <div class="thumb-ph {phClass}">
+            <div class="ph-tag">{phTag}</div>
+          </div>
+        {/if}
         {#if isFeatured}
           <span class="badge"><span class="badge-dot"></span>Featured</span>
         {/if}
@@ -139,6 +153,15 @@
   }
   .thumb.tall  { aspect-ratio: 4 / 5; }
   .thumb.wide  { aspect-ratio: 21 / 10; }
+
+  .thumb-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
 
   .thumb-ph {
     position: absolute; inset: 0;

@@ -6,7 +6,7 @@
 
 <footer>
   <div class="left">
-    By Freedium &amp; <strong>2,140</strong> contributors.
+    By Freedium.
     <span class="built">— made with care.</span>
   </div>
 

@@ -41,6 +41,13 @@ const EDITORIAL_CARDS: { position: number; post: Omit<BlogPost, "id"> }[] = [
 	},
 ];
 
+/** Build a Medium CDN URL for a preview image id. The browser fetches
+ * these directly (client-side) — they're public CDN assets, so no WARP
+ * proxy is involved. Featured cards get a larger width. */
+function mediumImageUrl(imageId: string, width: number): string {
+	return `https://miro.medium.com/v2/resize:fit:${width}/${imageId}`;
+}
+
 function toBlogPost(p: RecentPost, index: number): Omit<BlogPost, "id"> {
 	const publishedMs = p.first_published_at ?? p.unlocked_at ?? Date.now();
 	return {
@@ -49,6 +56,11 @@ function toBlogPost(p: RecentPost, index: number): Omit<BlogPost, "id"> {
 		slug: p.post_id,
 		title: p.title,
 		excerpt: p.subtitle,
+		// Cover image from the backend's preview_image_id. Empty id → no
+		// imageUrl, so BlogCard falls back to its placeholder.
+		imageUrl: p.preview_image_id
+			? mediumImageUrl(p.preview_image_id, index === 0 ? 1400 : 800)
+			: undefined,
 		readingTime: String(p.reading_time || 1),
 		publishedAt: new Date(publishedMs).toISOString(),
 		creator: p.creator_name,

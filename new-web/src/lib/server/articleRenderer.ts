@@ -72,6 +72,10 @@ const CODE_ATTRIBUTES: Record<string, string> = {
 
 let highlighterInstance: HighlighterGeneric<BundledLanguage, BundledTheme> | null = null;
 
+// TODO: are we optimizing shiki loading by making it a singleton?
+// (Process-wide singleton currently holds every bundled language's grammar
+//  in memory. Revisit whether that's the right trade-off vs. lazy per-lang
+//  loading or a smaller curated language set.)
 async function getHighlighter(): Promise<HighlighterGeneric<BundledLanguage, BundledTheme>> {
 	if (!highlighterInstance) {
 		highlighterInstance = await createHighlighter(HIGHLIGHT_CONFIG);

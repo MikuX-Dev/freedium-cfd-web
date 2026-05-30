@@ -18,4 +18,15 @@ declare module '~icons/*?raw' {
 	export default src;
 }
 
+// The ALTCHA web component (<altcha-widget>) is a custom element with no
+// built-in Svelte/JSX typing. Declare its attributes so svelte-check passes.
+declare namespace svelteHTML {
+	interface IntrinsicElements {
+		'altcha-widget': {
+			challengeurl?: string;
+			[key: string]: unknown;
+		};
+	}
+}
+
 export {};

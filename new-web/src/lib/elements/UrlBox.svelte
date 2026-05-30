@@ -1,12 +1,61 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
+  import config from '@/config';
 
   let { showProtocol = true }: { showProtocol?: boolean } = $props();
   let url = $state('');
+  let altchaPayload = $state<string | null>(null);
+  let altchaError = $state<string | null>(null);
+
+  onMount(async () => {
+    if (config.ALTCHA_ENABLED) {
+      await import('altcha');
+    }
+  });
+
+  function onAltchaStateChange(event: Event) {
+    const detail = (event as CustomEvent<{ state?: string; payload?: string }>).detail;
+    if (detail?.state === 'verified' && detail.payload) {
+      altchaPayload = detail.payload;
+      altchaError = null;
+    } else {
+      altchaPayload = null;
+    }
+  }
 
   async function handleSubmit(event: Event) {
     event.preventDefault();
-    if (url.trim()) await goto(`/${url.trim()}`);
+    const target = url.trim();
+    if (!target) return;
+
+    if (!config.ALTCHA_ENABLED) {
+      await goto(`/${target}`);
+      return;
+    }
+
+    if (!altchaPayload) {
+      altchaError = 'Please complete the verification.';
+      return;
+    }
+
+    try {
+      const res = await fetch('/altcha/verify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ payload: altchaPayload }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.ok) {
+        await goto(`/${target}`);
+      } else {
+        altchaPayload = null;
+        altchaError = 'Verification failed. Please try again.';
+      }
+    } catch {
+      altchaPayload = null;
+      altchaError = 'Verification failed. Please try again.';
+    }
   }
 </script>
 
@@ -36,6 +85,16 @@
       <path d="M5 12h14M13 5l7 7-7 7"/>
     </svg>
   </button>
+
+  {#if config.ALTCHA_ENABLED}
+    <div class="altcha-row">
+      <altcha-widget challengeurl="/altcha/challenge" onstatechange={onAltchaStateChange}
+      ></altcha-widget>
+      {#if altchaError}
+        <p class="altcha-error" role="alert">{altchaError}</p>
+      {/if}
+    </div>
+  {/if}
 </form>
 
 <style>
@@ -97,6 +156,17 @@
   }
   button:hover { filter: brightness(1.08); }
   button svg { width: 14px; height: 14px; }
+
+  .altcha-row {
+    grid-column: 1 / -1;
+    padding: 4px 8px 6px;
+    --altcha-max-width: 100%;
+  }
+  .altcha-error {
+    margin: 6px 2px 0;
+    font-size: 12.5px;
+    color: oklch(0.62 0.2 25);
+  }
 
   @media (max-width: 540px) {
     .unlock { grid-template-columns: 1fr auto; }

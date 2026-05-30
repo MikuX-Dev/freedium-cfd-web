@@ -123,6 +123,7 @@ class TestPostMetadata:
             preview_image_id="img1",
             creator_name="Author",
             creator_id="auth1",
+            creator_avatar_id="avatar1",
             collection_name=None,
             reading_time=5,
             first_published_at=None,
@@ -140,6 +141,7 @@ class TestPostMetadata:
             preview_image_id="img1",
             creator_name="Author",
             creator_id="auth1",
+            creator_avatar_id="avatar1",
             collection_name="Tech",
             reading_time=5,
             first_published_at=1234567890,
@@ -197,7 +199,7 @@ class TestMediumMarkdownRendererParagraphs:
             {"type": "H2", "name": "h2_1", "text": "Main Header", "markups": []}
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "## Main Header" in result
 
@@ -207,7 +209,7 @@ class TestMediumMarkdownRendererParagraphs:
             {"type": "H3", "name": "h3_1", "text": "Sub Header", "markups": []}
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "### Sub Header" in result
 
@@ -217,7 +219,7 @@ class TestMediumMarkdownRendererParagraphs:
             {"type": "P", "name": "p1", "text": "This is a paragraph.", "markups": []}
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "This is a paragraph." in result
 
@@ -228,7 +230,7 @@ class TestMediumMarkdownRendererParagraphs:
             {"type": "ULI", "name": "li2", "text": "Second item", "markups": []},
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "- First item" in result
         assert "- Second item" in result
@@ -240,7 +242,7 @@ class TestMediumMarkdownRendererParagraphs:
             {"type": "OLI", "name": "li2", "text": "Second item", "markups": []},
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "1. First item" in result
         assert "2. Second item" in result
@@ -257,7 +259,7 @@ class TestMediumMarkdownRendererParagraphs:
             }
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "```python" in result
         assert "print('hello')" in result
@@ -269,7 +271,7 @@ class TestMediumMarkdownRendererParagraphs:
             {"type": "BQ", "name": "bq1", "text": "A wise quote", "markups": []}
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "> A wise quote" in result
 
@@ -286,7 +288,7 @@ class TestMediumMarkdownRendererParagraphs:
             }
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "![Alt text]" in result
         assert "image123" in result
@@ -312,7 +314,7 @@ class TestMediumMarkdownRendererParagraphs:
             }
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "[Embedded content](https://example.com/embed)" in result
         assert "<!-- iframe: 800x600 -->" in result
@@ -334,7 +336,7 @@ class TestMediumMarkdownRendererParagraphs:
             }
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "[Embedded content: iframe123]" in result
 
@@ -358,7 +360,7 @@ class TestMediumMarkdownRendererParagraphs:
             }
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
         assert "[Embedded content](https://example.com/embed)" in result
         assert "<!-- iframe: 1024x768 -->" in result
@@ -472,7 +474,7 @@ class TestMediumMarkdownRendererTableOfContents:
             {"type": "H2", "name": "h2_2", "text": "Conclusion", "markups": []},
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
 
         result = await renderer.render_with_frontmatter()
 
@@ -509,7 +511,7 @@ class TestMediumMarkdownRendererTableOfContents:
             },
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
 
         result = await renderer.render_with_frontmatter()
 
@@ -526,7 +528,7 @@ class TestMediumMarkdownRendererTableOfContents:
             {"type": "H4", "name": "h4_1", "text": "Small Header", "markups": []},
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
 
         result = await renderer.render_with_frontmatter()
 
@@ -542,7 +544,7 @@ class TestMediumMarkdownRendererTableOfContents:
             {"type": "P", "name": "p1", "text": "Just a paragraph", "markups": []},
         ]
         post_data = self._create_mock_post_data(paragraphs)
-        renderer = MediumMarkdownRenderer(post_data)
+        renderer = MediumMarkdownRenderer(post_data, None)
 
         result = await renderer.render_with_frontmatter()
 

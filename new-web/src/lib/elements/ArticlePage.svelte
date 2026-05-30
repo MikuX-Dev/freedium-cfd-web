@@ -39,6 +39,10 @@
 	const TOC_COLLAPSED_COUNT = 5;
 	let tocExpanded = $state(false);
 	let tocVisible = $derived(tocExpanded ? toc : toc.slice(0, TOC_COLLAPSED_COUNT));
+	// Normalize indentation to the shallowest heading the article actually
+	// uses: an all-H3 article (Medium often flattens to one level) renders
+	// flat, while a mixed H2/H3/H4 article shows real nesting.
+	let tocMinLevel = $derived(toc.length ? Math.min(...toc.map((t) => t.level)) : 2);
 
 	function downloadMarkdown() {
 		if (!data.slug) return;
@@ -250,13 +254,13 @@
 											<a
 												href={`#${item.id}`}
 												class="flex items-start gap-3 py-3 pr-4 text-sm transition-colors text-zinc-700 hover:text-zinc-900 dark:text-gray-200 dark:hover:text-white hover:bg-accent/60"
-												class:toc-sub={item.level > 2}
-												style="padding-left: {0.75 + (item.level - 2) * 1}rem"
+												class:toc-sub={item.level > tocMinLevel}
+												style="padding-left: {0.75 + (item.level - tocMinLevel) * 1}rem"
 											>
 												<span
 													class="shrink-0 w-6 pt-0.5 font-mono text-xs text-right text-zinc-400 dark:text-zinc-500"
 												>
-													{#if item.level > 2}
+													{#if item.level > tocMinLevel}
 														&ndash;
 													{:else}
 														{i + 1}

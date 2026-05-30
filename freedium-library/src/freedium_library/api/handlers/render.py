@@ -1,3 +1,5 @@
+import asyncio
+
 from beartype import beartype
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -17,6 +19,12 @@ from freedium_library.services.medium.container import MediumContainer
 from freedium_library.services.medium.exceptions import InvalidMediumServicePathError
 from freedium_library.services.recent_posts import RecentPostsService
 from freedium_library.services.resolver import ServiceResolver, ServiceResolutionError
+
+# How long to render inline before handing off to the TaskIQ worker.
+# L1-warm renders (the common case) finish in well under this budget and
+# are returned directly. Only genuinely-cold renders (L1 miss → slow Medium
+# GraphQL fetch through WARP) exceed it and get dispatched to the worker.
+INLINE_BUDGET = 3.0
 
 
 class RenderRequest(BaseModel):
@@ -137,61 +145,96 @@ async def render_universal(
             pass  # treat L2 read failure as a miss
     RENDERED_CACHE_MISSES.inc()
 
-    # Cold render: dispatch to TaskIQ worker so uvicorn workers stay
-    # free for L2-cached requests. The frontend polls /render/poll/
-    # until the worker's result is ready via the RedisAsyncResultBackend.
     from freedium_library.tasks.cache import render_article_async
 
-    try:
-        dispatch = await render_article_async.kiq(
-            content=request.content,
-            frontmatter=request.frontmatter,
-        )
-    except Exception:
-        # Broker unreachable — fall through to synchronous render
-        pass
-    else:
-        return RenderResponse(
-            markdown="",
-            service="pending",
-            cache_status="pending",
-            task_id=dispatch.task_id,
-        )
+    async def _render_inline(timeout: float | None) -> RenderResponse:
+        """Resolve + render the content, optionally under a time budget.
+
+        When `timeout` is set, each render coroutine is wrapped in
+        `asyncio.wait_for`; a slow (cold) render raises asyncio.TimeoutError
+        which the caller turns into a worker hand-off. When `timeout` is
+        None the render runs to completion (broker-down fallback path).
+        """
+
+        async def _wait(coro):
+            if timeout is None:
+                return await coro
+            return await asyncio.wait_for(coro, timeout=timeout)
+
+        # Get resolver from app state
+        resolver: ServiceResolver = http_request.app.state.service_resolver
+
+        # Resolve the content to appropriate service
+        service_name, service = await resolver.resolve(request.content)
+
+        # Render using the resolved service. For Medium, use the *_and_metadata
+        # variants so we can populate the recent-posts feed in the same GraphQL
+        # fetch — no extra round-trip just for feed data.
+        if service_name == "medium" and isinstance(service, MediumService):
+            if request.frontmatter:
+                markdown, metadata = await _wait(
+                    service.arender_with_frontmatter_and_metadata(request.content)
+                )
+            else:
+                markdown, metadata = await _wait(
+                    service.arender_with_metadata(request.content)
+                )
+            await _record_recent(http_request, metadata)
+        else:
+            if request.frontmatter:
+                markdown = await _wait(
+                    service.arender_with_frontmatter(request.content)
+                )
+            else:
+                markdown = await _wait(service.arender(request.content))
+
+        # Write to L2 rendered cache (async via TaskIQ)
+        if rendered_cache is not None:
+            from freedium_library.tasks.cache import write_rendered_cache
+            try:
+                await write_rendered_cache.kiq(request.content, markdown, service_name)
+            except Exception:
+                pass  # broker down — fall through silently
+
+        return RenderResponse(markdown=markdown, service=service_name)
 
     with track_render(ARTICLE_RENDER) as ctx:
         try:
-            # Get resolver from app state
-            resolver: ServiceResolver = http_request.app.state.service_resolver
+            # Render inline with a short budget. L1-warm articles return in
+            # well under INLINE_BUDGET and never touch the worker queue.
+            return await _render_inline(timeout=INLINE_BUDGET)
 
-            # Resolve the content to appropriate service
-            service_name, service = await resolver.resolve(request.content)
-
-            # Render using the resolved service. For Medium, use the *_and_metadata
-            # variants so we can populate the recent-posts feed in the same GraphQL
-            # fetch — no extra round-trip just for feed data.
-            if service_name == "medium" and isinstance(service, MediumService):
-                if request.frontmatter:
-                    markdown, metadata = (
-                        await service.arender_with_frontmatter_and_metadata(request.content)
-                    )
-                else:
-                    markdown, metadata = await service.arender_with_metadata(request.content)
-                await _record_recent(http_request, metadata)
-            else:
-                if request.frontmatter:
-                    markdown = await service.arender_with_frontmatter(request.content)
-                else:
-                    markdown = await service.arender(request.content)
-
-            # Write to L2 rendered cache (async via TaskIQ)
-            if rendered_cache is not None:
-                from freedium_library.tasks.cache import write_rendered_cache
+        except asyncio.TimeoutError:
+            # Genuinely slow (cold / L1 miss). The wait_for already cancelled
+            # the render. Hand off to the TaskIQ worker and let the frontend
+            # poll for the result.
+            try:
+                dispatch = await render_article_async.kiq(
+                    content=request.content,
+                    frontmatter=request.frontmatter,
+                )
+            except Exception:
+                # Broker unreachable — serve the article inline anyway,
+                # just slowly (no budget). Preserve error handling below.
                 try:
-                    await write_rendered_cache.kiq(request.content, markdown, service_name)
-                except Exception:
-                    pass  # broker down — fall through silently
-
-            return RenderResponse(markdown=markdown, service=service_name)
+                    return await _render_inline(timeout=None)
+                except (ServiceResolutionError, InvalidMediumServicePathError) as e:
+                    ctx.set_outcome("parser_failure")
+                    log_errored_link(request.content, "parser_failure", None, str(e))
+                    raise HTTPException(status_code=404, detail=str(e)) from e
+                except Exception as e:
+                    ctx.set_outcome("network_error")
+                    log_errored_link(request.content, "network_error", None, str(e))
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error rendering content: {str(e)}",
+                    ) from e
+            return RenderResponse(
+                markdown="",
+                service="pending",
+                cache_status="pending",
+                task_id=dispatch.task_id,
+            )
 
         except ServiceResolutionError as e:
             ctx.set_outcome("parser_failure")

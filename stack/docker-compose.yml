@@ -227,6 +227,8 @@ services:
       - ./promtail/config.yml:/etc/promtail/config.yml:ro
       - errored_logs:/var/log/freedium:ro
       - promtail_data:/var/lib/promtail
+      # Read-only Docker socket for container log discovery (worker state etc.)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - loki
     networks:

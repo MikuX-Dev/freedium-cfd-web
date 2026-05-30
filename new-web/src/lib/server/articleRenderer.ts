@@ -358,7 +358,38 @@ export interface ArticleMetadata {
 	postImageZoom: string | null;
 	postImageCaption?: string;
 	url: string | null;
-	tableOfContents: Array<{ id: string; title: string }>;
+	tableOfContents: Array<{ id: string; title: string; level: number }>;
+}
+
+/** Recursively concatenate the text content of a HAST node. */
+function hastText(node: any): string {
+	if (!node) return "";
+	if (node.type === "text") return node.value ?? "";
+	if (Array.isArray(node.children)) {
+		return node.children.map(hastText).join("");
+	}
+	return "";
+}
+
+/**
+ * Rehype plugin that collects every h2/h3/h4 heading (with an id) into the
+ * provided accumulator, capturing its id, heading level and text content.
+ * Must run AFTER rehypeSlug so heading ids are populated.
+ */
+function rehypeCollectToc(acc: Array<{ id: string; title: string; level: number }>) {
+	return (tree: Root) => {
+		visit(tree, "element", (n: Element) => {
+			if (["h2", "h3", "h4"].includes(n.tagName) && n.properties?.id) {
+				const title = hastText(n).trim();
+				if (!title) return;
+				acc.push({
+					id: String(n.properties.id),
+					level: Number(n.tagName[1]),
+					title,
+				});
+			}
+		});
+	};
 }
 
 export interface RenderResult {
@@ -379,17 +410,26 @@ export async function renderArticle(
 
 	let article: ArticleMetadata | null = null;
 	let markdownContent = renderResult.markdown;
+	// Headings collected from the actual rendered HTML (correct rehype-slug ids
+	// + real h2/h3/h4 levels). Falls back to the frontmatter list only if empty.
+	const tocAcc: Array<{ id: string; title: string; level: number }> = [];
 
 	try {
 		const parsed = FrontMatter(renderResult.markdown);
 		const metadata = parsed.attributes as Record<string, any>;
 		markdownContent = parsed.body;
 
-		// Use table_of_contents from frontmatter
-		let tableOfContents: Array<{ id: string; title: string }> = [];
+		// Frontmatter table_of_contents is flat ({id,title}) and its slugs may not
+		// match the rendered ids. Use it only as a fallback (level 2) when the
+		// heading collector finds nothing.
+		let tableOfContents: Array<{ id: string; title: string; level: number }> = [];
 
 		if (metadata.table_of_contents && Array.isArray(metadata.table_of_contents)) {
-			tableOfContents = metadata.table_of_contents;
+			tableOfContents = metadata.table_of_contents.map((item: { id: string; title: string }) => ({
+				id: item.id,
+				title: item.title,
+				level: 2,
+			}));
 		}
 
 		// Extract preview image - handle both responsive object and simple string formats
@@ -455,6 +495,7 @@ export async function renderArticle(
 		.use(remarkParse)
 		.use(remarkRehype, { allowDangerousHtml: true })
 		.use(rehypeSlug)
+		.use(rehypeCollectToc, tocAcc)
 		.use(rehypeExternalLinks, {
 			target: "_blank",
 			rel: ["nofollow"],
@@ -469,6 +510,12 @@ export async function renderArticle(
 		.use(rehypeStringify, { allowDangerousHtml: true });
 
 	const result = await processor.process(markdownContent);
+
+	// Prefer the headings collected from the actual rendered HTML (correct ids +
+	// real levels) over the flat frontmatter fallback.
+	if (article && tocAcc.length) {
+		article.tableOfContents = tocAcc;
+	}
 
 	// Render the cover-image caption through the SAME pipeline so markdown spans
 	// (links, emphasis, code) become HTML — body figcaptions get rendered because

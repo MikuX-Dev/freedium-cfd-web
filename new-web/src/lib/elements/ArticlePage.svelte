@@ -249,12 +249,18 @@
 										<li>
 											<a
 												href={`#${item.id}`}
-												class="flex items-start gap-3 px-4 py-3 text-sm transition-colors text-zinc-700 hover:text-zinc-900 dark:text-gray-200 dark:hover:text-white hover:bg-accent/60"
+												class="flex items-start gap-3 py-3 pr-4 text-sm transition-colors text-zinc-700 hover:text-zinc-900 dark:text-gray-200 dark:hover:text-white hover:bg-accent/60"
+												class:toc-sub={item.level > 2}
+												style="padding-left: {0.75 + (item.level - 2) * 1}rem"
 											>
 												<span
 													class="shrink-0 w-6 pt-0.5 font-mono text-xs text-right text-zinc-400 dark:text-zinc-500"
 												>
-													{i + 1}
+													{#if item.level > 2}
+														&ndash;
+													{:else}
+														{i + 1}
+													{/if}
 												</span>
 												<span class="break-words">{item.title}</span>
 											</a>
@@ -294,6 +300,12 @@
 </div>
 
 <style>
+	/* De-emphasize nested (h3/h4) table-of-contents entries. */
+	.toc-sub {
+		font-size: 0.8125rem;
+		color: var(--color-zinc-500, #71717a);
+	}
+
 	.error-card {
 		max-width: 540px;
 		margin: 80px auto;

@@ -49,8 +49,8 @@ describe("buildPrintDocument", () => {
             {
                 ...baseArticle,
                 tableOfContents: [
-                    { id: "intro", title: "Intro" },
-                    { id: "more", title: "More" },
+                    { id: "intro", title: "Intro", level: 2 },
+                    { id: "more", title: "More", level: 2 },
                 ],
             },
             "<p>x</p>",

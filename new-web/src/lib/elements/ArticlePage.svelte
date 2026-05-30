@@ -34,6 +34,12 @@
 	let showSkeleton = $derived(!error && !contentLoaded);
 	let toc = $derived(article?.tableOfContents ?? []);
 
+	// Contents accordion: collapsed by default, showing only the first few
+	// sections; clicking the header (or "show all") reveals the rest.
+	const TOC_COLLAPSED_COUNT = 5;
+	let tocExpanded = $state(false);
+	let tocVisible = $derived(tocExpanded ? toc : toc.slice(0, TOC_COLLAPSED_COUNT));
+
 	function downloadMarkdown() {
 		if (!data.slug) return;
 		const link = document.createElement('a');
@@ -185,12 +191,8 @@
 						class="px-6 py-5 border-b border-gray-200 dark:border-zinc-700"
 						aria-labelledby={toc.length > 0 ? 'toc-heading' : undefined}
 					>
-						<div
-							class="flex flex-wrap items-start gap-3 {toc.length > 0 ? 'justify-between mb-3' : 'justify-end'}"
-						>
-							{#if toc.length > 0}
-								<h2 id="toc-heading" class="text-xl font-semibold text-primary">Contents</h2>
-							{/if}
+						<!-- Row 1: download action, right-aligned on its own line -->
+						<div class="flex justify-end">
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger>
 									{#snippet child({ props })}
@@ -215,19 +217,60 @@
 								</DropdownMenu.Content>
 							</DropdownMenu.Root>
 						</div>
+
+						<!-- Row 2: Contents accordion (own row, collapsed by default) -->
 						{#if toc.length > 0}
-							<ul class="space-y-1">
-								{#each toc as item}
-									<li>
-										<a
-											href={`#${item.id}`}
-											class="block px-2 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 dark:text-gray-100 dark:hover:text-white hover:bg-accent rounded-md text-wrap break-words"
+							<div
+								class="mt-4 overflow-hidden border rounded-lg border-gray-200 dark:border-zinc-700"
+							>
+								<button
+									type="button"
+									aria-expanded={tocExpanded}
+									aria-controls="toc-list"
+									onclick={() => (tocExpanded = !tocExpanded)}
+									class="flex items-center justify-between w-full gap-2 px-4 py-3 cursor-pointer select-none bg-gray-50 dark:bg-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-700"
+								>
+									<span class="flex items-center gap-2">
+										<h2 id="toc-heading" class="text-lg font-semibold text-primary">Contents</h2>
+										<span
+											class="px-2 py-0.5 text-xs font-medium rounded-full text-zinc-600 bg-gray-200 dark:bg-zinc-700 dark:text-zinc-300"
 										>
-											{item.title}
-										</a>
-									</li>
-								{/each}
-							</ul>
+											{toc.length}
+										</span>
+									</span>
+									<HeroiconsChevronDown20Solid
+										class="size-5 text-zinc-500 transition-transform duration-200 {tocExpanded
+											? 'rotate-180'
+											: ''}"
+									/>
+								</button>
+								<ul id="toc-list" class="divide-y divide-gray-200 dark:divide-zinc-700">
+									{#each tocVisible as item, i}
+										<li>
+											<a
+												href={`#${item.id}`}
+												class="flex items-start gap-3 px-4 py-3 text-sm transition-colors text-zinc-700 hover:text-zinc-900 dark:text-gray-200 dark:hover:text-white hover:bg-accent/60"
+											>
+												<span
+													class="shrink-0 w-6 pt-0.5 font-mono text-xs text-right text-zinc-400 dark:text-zinc-500"
+												>
+													{i + 1}
+												</span>
+												<span class="break-words">{item.title}</span>
+											</a>
+										</li>
+									{/each}
+								</ul>
+								{#if !tocExpanded && toc.length > TOC_COLLAPSED_COUNT}
+									<button
+										type="button"
+										onclick={() => (tocExpanded = true)}
+										class="block w-full px-4 py-2.5 text-sm font-medium text-center cursor-pointer text-primary border-t border-gray-200 dark:border-zinc-700 bg-gray-50/50 dark:bg-zinc-800/50 hover:bg-gray-100 dark:hover:bg-zinc-700"
+									>
+										Show all {toc.length} sections
+									</button>
+								{/if}
+							</div>
 						{/if}
 					</section>
 

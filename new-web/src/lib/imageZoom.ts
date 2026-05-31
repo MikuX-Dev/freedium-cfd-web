@@ -61,6 +61,9 @@ function onKey(e: KeyboardEvent): void {
 	if (e.key === "Escape") close();
 }
 
+// Any scroll gesture while open closes the lightbox (medium-zoom feel).
+let scrollClose: (() => void) | null = null;
+
 /** Derive the 2000px variant of an /img proxy URL, if applicable. */
 function highResVariant(src: string): string | null {
 	const m = src.match(/\/img\/\d+\/(.+)$/);
@@ -92,19 +95,64 @@ export function openLightbox(img: HTMLImageElement): void {
 	overlayCaption.textContent = caption || "";
 	overlayCaption.style.display = caption ? "" : "none";
 
+	// Reveal at final (centered, contained) layout, transition off, so we
+	// can measure where the image ends up.
 	overlay.hidden = false;
-	// next frame → trigger the fade-in transition
+	overlayImg.style.transition = "none";
+	overlayImg.style.transform = "none";
+	const finalRect = overlayImg.getBoundingClientRect();
+	const srcRect = img.getBoundingClientRect();
+
+	// FLIP: place the overlay image exactly over the clicked thumbnail, then
+	// animate it to its final centered position so it "grows" out of the page.
+	if (finalRect.width > 0 && srcRect.width > 0) {
+		const scale = srcRect.width / finalRect.width;
+		const dx =
+			srcRect.left + srcRect.width / 2 - (finalRect.left + finalRect.width / 2);
+		const dy =
+			srcRect.top + srcRect.height / 2 - (finalRect.top + finalRect.height / 2);
+		overlayImg.style.transformOrigin = "center center";
+		overlayImg.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+		void overlayImg.offsetWidth; // flush the start state
+		requestAnimationFrame(() => {
+			if (!overlayImg) return;
+			overlayImg.style.transition = "transform .28s cubic-bezier(.2,0,.2,1)";
+			overlayImg.style.transform = "none";
+		});
+	}
+
 	requestAnimationFrame(() => overlay?.classList.add("fz-open"));
 	document.body.style.overflow = "hidden";
 	document.addEventListener("keydown", onKey);
+
+	// Close on any scroll/wheel/touch-move while open.
+	scrollClose = () => close();
+	window.addEventListener("wheel", scrollClose, { passive: true });
+	window.addEventListener("touchmove", scrollClose, { passive: true });
+	window.addEventListener("scroll", scrollClose, { passive: true });
 }
 
 function close(): void {
-	if (!overlay) return;
+	if (!overlay || overlay.hidden) return;
 	overlay.classList.remove("fz-open");
-	overlay.hidden = true;
 	document.body.style.overflow = "";
 	document.removeEventListener("keydown", onKey);
+	if (scrollClose) {
+		window.removeEventListener("wheel", scrollClose);
+		window.removeEventListener("touchmove", scrollClose);
+		window.removeEventListener("scroll", scrollClose);
+		scrollClose = null;
+	}
+	// Fade the backdrop out, then hide + reset the image transform.
+	const el = overlay;
+	const imgEl = overlayImg;
+	window.setTimeout(() => {
+		el.hidden = true;
+		if (imgEl) {
+			imgEl.style.transition = "none";
+			imgEl.style.transform = "none";
+		}
+	}, 160);
 }
 
 /** Bind every `.prose-image` in the rendered article to the lightbox. */

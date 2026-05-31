@@ -62,7 +62,10 @@ async def _inline_images_as_base64_markdown(markdown: str) -> str:
         if not fetch_url:
             continue
         m_alt = _ALT_RE.search(block)
-        alt = (m_alt.group(1) if m_alt else "").replace("]", "").replace("[", "")
+        alt = m_alt.group(1) if m_alt else ""
+        if alt == "None":  # renderer emits alt="None" when alt is absent
+            alt = ""
+        alt = alt.replace("]", "").replace("[", "")
         jobs.append((block, alt, fetch_url))
         fetch_urls[fetch_url] = None
 

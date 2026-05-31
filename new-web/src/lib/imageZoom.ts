@@ -1,67 +1,123 @@
-import mediumZoom from 'medium-zoom';
-import type { Zoom } from 'medium-zoom';
+/**
+ * Lightweight, dependency-free image lightbox.
+ *
+ * Replaces medium-zoom. The old viewer fetched the 4000px `data-zoom-src`
+ * variant on click — a multi-MB image pulled cold through the WARP proxy,
+ * which made zoom slow / hang. This opens INSTANTLY with the resolution the
+ * browser already loaded (`currentSrc`, 700/2000px in cache), then quietly
+ * upgrades to the 2000px variant in the background. It never loads 4000px
+ * and the upgrade never blocks the open, so it can't hang.
+ */
 
-let zoom: Zoom | null = null;
-let captionElement: HTMLDivElement | null = null;
+let overlay: HTMLDivElement | null = null;
+let overlayImg: HTMLImageElement | null = null;
+let overlayCaption: HTMLDivElement | null = null;
 
-export function initializeImageZoom(): void {
-	// Initialize zoom instance if not already created
-	if (zoom === null) {
-		zoom = mediumZoom({
-			background: 'rgba(0, 0, 0, 0.8)',
-			margin: 24,
-		});
+const STYLE_ID = "fz-lightbox-style";
+const CSS = `
+.fz-lightbox{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;
+justify-content:center;background:rgba(0,0,0,.92);cursor:zoom-out;padding:24px;
+opacity:0;transition:opacity .15s ease;}
+.fz-lightbox.fz-open{opacity:1;}
+.fz-lightbox[hidden]{display:none;}
+.fz-lightbox-img{max-width:100%;max-height:100%;object-fit:contain;
+box-shadow:0 8px 50px rgba(0,0,0,.5);border-radius:2px;}
+.fz-lightbox-caption{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+color:#fff;font-style:italic;font-size:15px;line-height:1.5;max-width:80%;
+text-align:center;padding:8px 16px;background:rgba(0,0,0,.6);border-radius:8px;
+pointer-events:none;}
+`;
 
-		// Add event listeners to show/hide caption
-		zoom.on('open', (event) => {
-			const img = event.target instanceof HTMLImageElement ? event.target : null;
-			const captionText = img?.getAttribute('data-caption');
+function injectStyleOnce(): void {
+	if (document.getElementById(STYLE_ID)) return;
+	const el = document.createElement("style");
+	el.id = STYLE_ID;
+	el.textContent = CSS;
+	document.head.appendChild(el);
+}
 
-			if (captionText && !captionElement) {
-				captionElement = document.createElement('div');
-				captionElement.style.position = 'fixed';
-				captionElement.style.bottom = '40px';
-				captionElement.style.left = '50%';
-				captionElement.style.transform = 'translateX(-50%)';
-				captionElement.style.color = 'white';
-				captionElement.style.fontSize = '16px';
-				captionElement.style.fontStyle = 'italic';
-				captionElement.style.textAlign = 'center';
-				captionElement.style.maxWidth = '80%';
-				captionElement.style.padding = '10px 20px';
-				captionElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-				captionElement.style.borderRadius = '8px';
-				captionElement.style.zIndex = '9999';
-				captionElement.style.pointerEvents = 'none';
-				captionElement.textContent = captionText;
-				document.body.appendChild(captionElement);
-			}
-		});
+function ensureOverlay(): void {
+	if (overlay) return;
+	injectStyleOnce();
+	overlay = document.createElement("div");
+	overlay.className = "fz-lightbox";
+	overlay.hidden = true;
+	overlay.setAttribute("role", "dialog");
+	overlay.setAttribute("aria-modal", "true");
 
-		zoom.on('close', () => {
-			if (captionElement) {
-				captionElement.remove();
-				captionElement = null;
-			}
-		});
+	overlayImg = document.createElement("img");
+	overlayImg.className = "fz-lightbox-img";
+	overlayImg.alt = "";
+
+	overlayCaption = document.createElement("div");
+	overlayCaption.className = "fz-lightbox-caption";
+
+	overlay.append(overlayImg, overlayCaption);
+	overlay.addEventListener("click", close);
+	document.body.appendChild(overlay);
+}
+
+function onKey(e: KeyboardEvent): void {
+	if (e.key === "Escape") close();
+}
+
+/** Derive the 2000px variant of an /img proxy URL, if applicable. */
+function highResVariant(src: string): string | null {
+	const m = src.match(/\/img\/\d+\/(.+)$/);
+	return m ? `/img/2000/${m[1]}` : null;
+}
+
+/** Open the lightbox for an image — instant, no blocking network. */
+export function openLightbox(img: HTMLImageElement): void {
+	ensureOverlay();
+	if (!overlay || !overlayImg || !overlayCaption) return;
+
+	// Show what's already decoded in the browser — zero network, instant.
+	const loaded = img.currentSrc || img.src;
+	overlayImg.src = loaded;
+	overlayImg.alt = img.alt || "";
+
+	// Quietly upgrade to the 2000px variant (never 4000px). Non-blocking:
+	// if the fetch is slow/fails, the lightbox just keeps the loaded image.
+	const hi = highResVariant(img.dataset.zoomSrc || img.src || "");
+	if (hi && hi !== loaded) {
+		const pre = new Image();
+		pre.onload = () => {
+			if (overlay && !overlay.hidden && overlayImg) overlayImg.src = hi;
+		};
+		pre.src = hi;
 	}
 
-	// Find all zoomable images (both preview image and article prose images)
-	// .prose-image class is added to all img elements that should support zoom
-	const images = document.querySelectorAll<HTMLImageElement>('.prose-image');
+	const caption = img.getAttribute("data-caption");
+	overlayCaption.textContent = caption || "";
+	overlayCaption.style.display = caption ? "" : "none";
 
-	// Attach zoom to each image
+	overlay.hidden = false;
+	// next frame → trigger the fade-in transition
+	requestAnimationFrame(() => overlay?.classList.add("fz-open"));
+	document.body.style.overflow = "hidden";
+	document.addEventListener("keydown", onKey);
+}
+
+function close(): void {
+	if (!overlay) return;
+	overlay.classList.remove("fz-open");
+	overlay.hidden = true;
+	document.body.style.overflow = "";
+	document.removeEventListener("keydown", onKey);
+}
+
+/** Bind every `.prose-image` in the rendered article to the lightbox. */
+export function initializeImageZoom(): void {
+	const images = document.querySelectorAll<HTMLImageElement>(".prose-image");
 	images.forEach((img) => {
-		zoom?.attach(img);
+		if (img.dataset.fzBound) return;
+		img.dataset.fzBound = "1";
+		img.style.cursor = "zoom-in";
+		img.addEventListener("click", () => openLightbox(img));
 	});
 }
 
 export function cleanupImageZoom(): void {
-	if (zoom) {
-		zoom.detach();
-	}
-	if (captionElement) {
-		captionElement.remove();
-		captionElement = null;
-	}
+	close();
 }

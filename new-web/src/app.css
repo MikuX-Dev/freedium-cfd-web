@@ -88,15 +88,6 @@
   ::selection { @apply bg-primary text-primary-foreground; }
 }
 
-.medium-zoom-overlay,
-.medium-zoom-image--opened {
-  z-index: 999;
-}
-
-.medium-zoom-overlay {
-  background: var(--bg) !important;
-}
-
 @layer base {
   /* Shiki syntax highlighting */
   pre.shiki { counter-reset: line-number; }

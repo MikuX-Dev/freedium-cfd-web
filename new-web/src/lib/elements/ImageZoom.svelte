@@ -24,6 +24,7 @@
 			{src}
 			{alt}
 			data-zoom-src={zoomSrc}
+			data-caption={caption}
 			{...$$restProps}
 			style="cursor: zoom-in"
 			on:click={open}

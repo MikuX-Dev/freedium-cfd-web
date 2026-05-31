@@ -148,11 +148,26 @@ function updateNav(): void {
 	if (nextBtn) nextBtn.hidden = !many;
 }
 
-/** Step to the previous/next image (cyclic). */
+/** Step to the previous/next image (cyclic) with a directional slide+fade. */
 function navigate(delta: number): void {
-	if (!overlay || overlay.hidden || gallery.length < 2 || currentIndex < 0) return;
+	if (!overlay || overlay.hidden || gallery.length < 2 || currentIndex < 0 || !overlayImg)
+		return;
 	currentIndex = (currentIndex + delta + gallery.length) % gallery.length;
 	renderImage(gallery[currentIndex]);
+
+	// Single-phase: swap instantly, then slide the new image in from the side
+	// it's coming from (next → from the right, prev → from the left) with a
+	// quick fade. No timers, so rapid paging stays snappy and never races.
+	const img = overlayImg;
+	img.style.transition = "none";
+	img.style.transform = `translateX(${delta * 44}px)`;
+	img.style.opacity = "0.25";
+	void img.offsetWidth; // flush the start state
+	requestAnimationFrame(() => {
+		img.style.transition = "transform .22s cubic-bezier(.2,0,.2,1), opacity .2s ease";
+		img.style.transform = "none";
+		img.style.opacity = "1";
+	});
 }
 
 /** Open the lightbox for an image — instant, no blocking network. */
@@ -169,10 +184,12 @@ export function openLightbox(img: HTMLImageElement): void {
 	renderImage(img);
 
 	// Reveal at final (centered, contained) layout, transition off, so we
-	// can measure where the image ends up.
+	// can measure where the image ends up. Reset opacity in case a previous
+	// navigation animation left it mid-flight.
 	overlay.hidden = false;
 	overlayImg.style.transition = "none";
 	overlayImg.style.transform = "none";
+	overlayImg.style.opacity = "1";
 	const finalRect = overlayImg.getBoundingClientRect();
 	const srcRect = img.getBoundingClientRect();
 
@@ -224,6 +241,7 @@ function close(): void {
 		if (imgEl) {
 			imgEl.style.transition = "none";
 			imgEl.style.transform = "none";
+			imgEl.style.opacity = "1";
 		}
 	}, 160);
 }

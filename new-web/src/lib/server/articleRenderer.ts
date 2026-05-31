@@ -538,8 +538,45 @@ export async function renderArticle(
 			.trim();
 	}
 
+	// Render body-image caption markdown → HTML server-side (same pipeline as
+	// the cover caption above) so the client lightbox just displays it — no
+	// client-side markdown parsing. Captions arrive as data-caption="<md>" on
+	// the raw <picture> the backend emits.
+	let html = String(result);
+	const decodeEntities = (s: string): string =>
+		s
+			.replace(/&lt;/g, "<")
+			.replace(/&gt;/g, ">")
+			.replace(/&quot;/g, '"')
+			.replace(/&#39;/g, "'")
+			.replace(/&amp;/g, "&"); // &amp; last to avoid double-decoding
+	const attrEscape = (s: string): string =>
+		s
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;");
+	const captionAttrs = new Set<string>();
+	for (const mm of html.matchAll(/data-caption="([^"]*)"/g)) captionAttrs.add(mm[1]);
+	const renderedByAttr = new Map<string, string>();
+	for (const escaped of captionAttrs) {
+		if (!escaped) continue;
+		const renderedCaption = String(await processor.process(decodeEntities(escaped)))
+			.trim()
+			.replace(/^<p>([\s\S]*)<\/p>$/, "$1")
+			.trim();
+		renderedByAttr.set(escaped, attrEscape(renderedCaption));
+	}
+	if (renderedByAttr.size) {
+		html = html.replace(
+			/data-caption="([^"]*)"/g,
+			(full, escaped) =>
+				renderedByAttr.has(escaped) ? `data-caption="${renderedByAttr.get(escaped)}"` : full,
+		);
+	}
+
 	return {
-		html: String(result),
+		html,
 		markdown: markdownContent,
 		article,
 		cacheStatus: renderResult.cache_status ?? "miss",

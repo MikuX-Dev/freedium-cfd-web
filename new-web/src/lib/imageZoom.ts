@@ -75,24 +75,6 @@ function highResVariant(src: string): string | null {
 	return m ? `/img/2000/${m[1]}` : null;
 }
 
-function escapeHtml(s: string): string {
-	return s
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
-}
-
-/** Render a caption's markdown links to safe HTML.
- * Everything is HTML-escaped first; only `[text](http(s)://url)` becomes an
- * <a> (escaped href + text), so there's no injection surface. */
-function renderCaption(md: string): string {
-	return escapeHtml(md).replace(
-		/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-		(_m, text, url) =>
-			`<a href="${escapeHtml(url)}" target="_blank" rel="noopener nofollow">${text}</a>`,
-	);
-}
 
 /** Open the lightbox for an image — instant, no blocking network. */
 export function openLightbox(img: HTMLImageElement): void {
@@ -115,8 +97,9 @@ export function openLightbox(img: HTMLImageElement): void {
 		pre.src = hi;
 	}
 
-	const caption = img.getAttribute("data-caption");
-	overlayCaption.innerHTML = caption ? renderCaption(caption) : "";
+	// data-caption is already rendered HTML (server-side, in articleRenderer) —
+	// just display it, no client-side parsing.
+	overlayCaption.innerHTML = img.getAttribute("data-caption") || "";
 
 	// Reveal at final (centered, contained) layout, transition off, so we
 	// can measure where the image ends up.

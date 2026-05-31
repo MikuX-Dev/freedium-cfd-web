@@ -22,10 +22,15 @@ opacity:0;transition:opacity .15s ease;}
 .fz-lightbox[hidden]{display:none;}
 .fz-lightbox-img{max-width:100%;max-height:100%;object-fit:contain;
 box-shadow:0 8px 50px rgba(0,0,0,.5);border-radius:2px;}
-.fz-lightbox-caption{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-color:#fff;font-style:italic;font-size:15px;line-height:1.5;max-width:80%;
-text-align:center;padding:8px 16px;background:rgba(0,0,0,.6);border-radius:8px;
-pointer-events:none;}
+.fz-lightbox-caption{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+color:rgba(255,255,255,.82);font-size:13px;line-height:1.5;max-width:min(640px,84%);
+text-align:center;padding:6px 16px;background:rgba(20,20,20,.45);
+backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:999px;
+pointer-events:auto;}
+.fz-lightbox-caption:empty{display:none;}
+.fz-lightbox-caption a{color:#fff;text-decoration:underline;text-underline-offset:2px;
+text-decoration-thickness:1px;}
+.fz-lightbox-caption a:hover{text-decoration-color:rgba(255,255,255,.6);}
 `;
 
 function injectStyleOnce(): void {
@@ -70,6 +75,25 @@ function highResVariant(src: string): string | null {
 	return m ? `/img/2000/${m[1]}` : null;
 }
 
+function escapeHtml(s: string): string {
+	return s
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;");
+}
+
+/** Render a caption's markdown links to safe HTML.
+ * Everything is HTML-escaped first; only `[text](http(s)://url)` becomes an
+ * <a> (escaped href + text), so there's no injection surface. */
+function renderCaption(md: string): string {
+	return escapeHtml(md).replace(
+		/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+		(_m, text, url) =>
+			`<a href="${escapeHtml(url)}" target="_blank" rel="noopener nofollow">${text}</a>`,
+	);
+}
+
 /** Open the lightbox for an image — instant, no blocking network. */
 export function openLightbox(img: HTMLImageElement): void {
 	ensureOverlay();
@@ -92,8 +116,7 @@ export function openLightbox(img: HTMLImageElement): void {
 	}
 
 	const caption = img.getAttribute("data-caption");
-	overlayCaption.textContent = caption || "";
-	overlayCaption.style.display = caption ? "" : "none";
+	overlayCaption.innerHTML = caption ? renderCaption(caption) : "";
 
 	// Reveal at final (centered, contained) layout, transition off, so we
 	// can measure where the image ends up.

@@ -1,17 +1,22 @@
 /**
- * Lightweight, dependency-free image lightbox.
+ * Lightweight, dependency-free image lightbox with prev/next navigation.
  *
- * Replaces medium-zoom. The old viewer fetched the 4000px `data-zoom-src`
- * variant on click — a multi-MB image pulled cold through the WARP proxy,
- * which made zoom slow / hang. This opens INSTANTLY with the resolution the
- * browser already loaded (`currentSrc`, 700/2000px in cache), then quietly
- * upgrades to the 2000px variant in the background. It never loads 4000px
- * and the upgrade never blocks the open, so it can't hang.
+ * Replaces medium-zoom. Opens INSTANTLY with the resolution the browser
+ * already decoded (`currentSrc`, 700/2000px in cache), then quietly upgrades
+ * to the 2000px variant in the background — never the 4000px, never blocking,
+ * so it can't hang. Arrows (and ← → keys) cycle through every zoomable image
+ * in the article; scroll / Esc / click closes.
  */
 
 let overlay: HTMLDivElement | null = null;
 let overlayImg: HTMLImageElement | null = null;
 let overlayCaption: HTMLDivElement | null = null;
+let prevBtn: HTMLButtonElement | null = null;
+let nextBtn: HTMLButtonElement | null = null;
+
+// Ordered list of images the lightbox can page through, + current position.
+let gallery: HTMLImageElement[] = [];
+let currentIndex = -1;
 
 const STYLE_ID = "fz-lightbox-style";
 const CSS = `
@@ -31,7 +36,22 @@ pointer-events:auto;}
 .fz-lightbox-caption a{color:#fff;text-decoration:underline;text-underline-offset:2px;
 text-decoration-thickness:1px;}
 .fz-lightbox-caption a:hover{text-decoration-color:rgba(255,255,255,.6);}
+.fz-nav{position:fixed;top:50%;transform:translateY(-50%);z-index:10000;display:flex;
+align-items:center;justify-content:center;width:46px;height:46px;border:none;
+border-radius:50%;background:rgba(0,0,0,.45);color:#fff;cursor:pointer;
+backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:background .15s;}
+.fz-nav:hover{background:rgba(0,0,0,.72);}
+.fz-prev{left:16px;}
+.fz-next{right:16px;}
+.fz-nav svg{width:24px;height:24px;}
+.fz-nav[hidden]{display:none;}
+@media(max-width:560px){.fz-nav{width:40px;height:40px;left:8px;}.fz-next{right:8px;}}
 `;
+
+const CHEVRON_LEFT =
+	'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
+const CHEVRON_RIGHT =
+	'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
 
 function injectStyleOnce(): void {
 	if (document.getElementById(STYLE_ID)) return;
@@ -57,13 +77,35 @@ function ensureOverlay(): void {
 	overlayCaption = document.createElement("div");
 	overlayCaption.className = "fz-lightbox-caption";
 
-	overlay.append(overlayImg, overlayCaption);
+	prevBtn = document.createElement("button");
+	prevBtn.type = "button";
+	prevBtn.className = "fz-nav fz-prev";
+	prevBtn.setAttribute("aria-label", "Previous image");
+	prevBtn.innerHTML = CHEVRON_LEFT;
+	prevBtn.addEventListener("click", (e) => {
+		e.stopPropagation(); // don't close
+		navigate(-1);
+	});
+
+	nextBtn = document.createElement("button");
+	nextBtn.type = "button";
+	nextBtn.className = "fz-nav fz-next";
+	nextBtn.setAttribute("aria-label", "Next image");
+	nextBtn.innerHTML = CHEVRON_RIGHT;
+	nextBtn.addEventListener("click", (e) => {
+		e.stopPropagation();
+		navigate(1);
+	});
+
+	overlay.append(overlayImg, overlayCaption, prevBtn, nextBtn);
 	overlay.addEventListener("click", close);
 	document.body.appendChild(overlay);
 }
 
 function onKey(e: KeyboardEvent): void {
 	if (e.key === "Escape") close();
+	else if (e.key === "ArrowLeft") navigate(-1);
+	else if (e.key === "ArrowRight") navigate(1);
 }
 
 // Any scroll gesture while open closes the lightbox (medium-zoom feel).
@@ -75,31 +117,56 @@ function highResVariant(src: string): string | null {
 	return m ? `/img/2000/${m[1]}` : null;
 }
 
+/** Load an image's content into the overlay: instant currentSrc, async 2000px
+ * upgrade, caption. No layout animation (used for open + navigation). */
+function renderImage(img: HTMLImageElement): void {
+	if (!overlayImg || !overlayCaption) return;
+	const loaded = img.currentSrc || img.src;
+	overlayImg.src = loaded;
+	overlayImg.alt = img.alt || "";
+
+	const hi = highResVariant(img.dataset.zoomSrc || img.src || "");
+	if (hi && hi !== loaded) {
+		const pre = new Image();
+		pre.onload = () => {
+			// Only apply if we're still showing this image (guards fast paging).
+			if (overlay && !overlay.hidden && overlayImg && gallery[currentIndex] === img) {
+				overlayImg.src = hi;
+			}
+		};
+		pre.src = hi;
+	}
+
+	// data-caption is already rendered HTML (server-side) — just display it.
+	overlayCaption.innerHTML = img.getAttribute("data-caption") || "";
+}
+
+/** Show/hide the arrows depending on how many images are in the gallery. */
+function updateNav(): void {
+	const many = gallery.length > 1 && currentIndex >= 0;
+	if (prevBtn) prevBtn.hidden = !many;
+	if (nextBtn) nextBtn.hidden = !many;
+}
+
+/** Step to the previous/next image (cyclic). */
+function navigate(delta: number): void {
+	if (!overlay || overlay.hidden || gallery.length < 2 || currentIndex < 0) return;
+	currentIndex = (currentIndex + delta + gallery.length) % gallery.length;
+	renderImage(gallery[currentIndex]);
+}
 
 /** Open the lightbox for an image — instant, no blocking network. */
 export function openLightbox(img: HTMLImageElement): void {
 	ensureOverlay();
 	if (!overlay || !overlayImg || !overlayCaption) return;
 
-	// Show what's already decoded in the browser — zero network, instant.
-	const loaded = img.currentSrc || img.src;
-	overlayImg.src = loaded;
-	overlayImg.alt = img.alt || "";
+	// Build the gallery from every zoomable image in document order so the
+	// arrows can page through them (cover + body images carry data-zoom-src).
+	gallery = Array.from(document.querySelectorAll<HTMLImageElement>("img[data-zoom-src]"));
+	currentIndex = gallery.indexOf(img);
+	updateNav();
 
-	// Quietly upgrade to the 2000px variant (never 4000px). Non-blocking:
-	// if the fetch is slow/fails, the lightbox just keeps the loaded image.
-	const hi = highResVariant(img.dataset.zoomSrc || img.src || "");
-	if (hi && hi !== loaded) {
-		const pre = new Image();
-		pre.onload = () => {
-			if (overlay && !overlay.hidden && overlayImg) overlayImg.src = hi;
-		};
-		pre.src = hi;
-	}
-
-	// data-caption is already rendered HTML (server-side, in articleRenderer) —
-	// just display it, no client-side parsing.
-	overlayCaption.innerHTML = img.getAttribute("data-caption") || "";
+	renderImage(img);
 
 	// Reveal at final (centered, contained) layout, transition off, so we
 	// can measure where the image ends up.
@@ -109,8 +176,8 @@ export function openLightbox(img: HTMLImageElement): void {
 	const finalRect = overlayImg.getBoundingClientRect();
 	const srcRect = img.getBoundingClientRect();
 
-	// FLIP: place the overlay image exactly over the clicked thumbnail, then
-	// animate it to its final centered position so it "grows" out of the page.
+	// FLIP: place the overlay image over the clicked thumbnail, then animate
+	// it to its final centered position so it "grows" out of the page.
 	if (finalRect.width > 0 && srcRect.width > 0) {
 		const scale = srcRect.width / finalRect.width;
 		const dx =

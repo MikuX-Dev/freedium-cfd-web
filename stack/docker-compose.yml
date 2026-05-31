@@ -5,14 +5,14 @@ services:
     build:
       context: ./wgcf-warp
     deploy:
-      # More replicas = more distinct Cloudflare WARP exit IPs behind
-      # haproxy-pb. Medium soft-blocks individual exit IPs (returns a
-      # 200 with null post), so a larger pool + the GraphQL retry makes
-      # it very unlikely all attempts hit blocked IPs. Each fresh boot
-      # registers its own WARP identity; some may lose the registration
-      # race on startup and restart — haproxy-pb's per-slot check routes
-      # only to the ones actually answering.
-      replicas: 20
+      # NOTE: scaling this UP does NOT add exit-IP diversity — Cloudflare
+      # WARP (free) funnels every tunnel through ~2 shared IPv4 egress IPs
+      # (104.28.x.x), so 20 replicas saw the same 2 IPs as 3. Worse, 20
+      # privileged WireGuard tunnels + healthchecks saturated the 4-vCPU
+      # box (load avg >90, OOM) and took production down. Keep this small.
+      # Real per-IP-soft-block resilience needs a residential/datacenter
+      # proxy pool, not more WARP tunnels.
+      replicas: 3
     networks:
       - freedium_obs_net
     restart: unless-stopped

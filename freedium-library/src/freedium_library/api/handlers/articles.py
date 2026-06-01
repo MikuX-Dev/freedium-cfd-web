@@ -8,6 +8,42 @@ from freedium_library.services.recent_posts import (
 )
 from freedium_library.services.recent_posts.container import RecentPostsContainer
 
+# Cheap in-process cache for the all-time unlocked-article count so the home
+# page doesn't hit Mongo on every load. {value, at} with a 120s TTL.
+_COUNT_CACHE: dict[str, float] = {"value": 0, "at": 0.0}
+_count_client = None
+
+
+def _post_cache_collection():
+    """Lazy motor handle to the L1 post_cache collection (distinct Medium
+    articles ever fetched ≈ articles unlocked, all-time)."""
+    global _count_client
+    import os
+
+    from motor.motor_asyncio import AsyncIOMotorClient
+
+    if _count_client is None:
+        _count_client = AsyncIOMotorClient(
+            os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+        )
+    db = _count_client[os.environ.get("MONGO_DB", "freedium_cache")]
+    return db["post_cache"]
+
+
+async def _unlocked_count() -> int:
+    import time
+
+    now = time.time()
+    if _COUNT_CACHE["value"] and now - _COUNT_CACHE["at"] < 120:
+        return int(_COUNT_CACHE["value"])
+    try:
+        n = await _post_cache_collection().estimated_document_count()
+        _COUNT_CACHE["value"] = n
+        _COUNT_CACHE["at"] = now
+        return int(n)
+    except Exception:  # noqa: BLE001 — degrade to last-known / 0, never 500
+        return int(_COUNT_CACHE["value"])
+
 
 @beartype
 @inject
@@ -78,6 +114,18 @@ def register_articles_router(router: APIRouter) -> None:
         description="Returns a random sample of recently-rendered posts, refreshed every 2 minutes.",
         tags=["articles"],
         response_model=RecentPostsResponse,
+    )
+
+    async def get_article_count() -> dict[str, int]:
+        return {"count": await _unlocked_count()}
+
+    articles_router.add_api_route(
+        "/count",
+        endpoint=get_article_count,
+        methods=["GET"],
+        summary="All-time unlocked-article count",
+        description="Number of distinct articles Freedium has unlocked (L1 cache size).",
+        tags=["articles"],
     )
 
     router.include_router(articles_router)

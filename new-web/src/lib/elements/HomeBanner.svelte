@@ -1,5 +1,16 @@
 <script lang="ts">
   import UrlBox from './UrlBox.svelte';
+
+  let { unlockedCount = null }: { unlockedCount?: number | null } = $props();
+
+  // Compact format: 4900 → "4.9K", 1200000 → "1.2M".
+  const unlockedLabel = $derived(
+    unlockedCount && unlockedCount > 0
+      ? new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(
+          unlockedCount,
+        )
+      : null,
+  );
 </script>
 
 <section class="hero">
@@ -63,11 +74,12 @@
     <p class="lede">Paste any paywalled article link below — Freedium fetches an open, ad-free version you can keep.</p>
     <UrlBox showProtocol={false} />
     <div class="unlock-meta">
-      <div class="stat">↳ <strong>1.2M</strong> articles unlocked this month</div>
+      {#if unlockedLabel}
+        <div class="stat">↳ <strong>{unlockedLabel}</strong> articles unlocked</div>
+      {/if}
       <div class="stat">
-        <kbd>↵</kbd> to unlock · <kbd>⇧↵</kbd> to save without opening
+        <kbd>↵</kbd> to unlock
       </div>
-      <div class="stat"><strong>26ms</strong> avg fetch</div>
     </div>
   </div>
 </section>

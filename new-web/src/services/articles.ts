@@ -36,3 +36,9 @@ export async function randomPosts(limit = 20): Promise<RecentPost[]> {
 
 	return response?.posts ?? [];
 }
+
+/** All-time count of distinct articles Freedium has unlocked (L1 cache size). */
+export async function articleCount(): Promise<number> {
+	const response = await apiFetch<{ count: number }>("/articles/count", { method: "GET" });
+	return response?.count ?? 0;
+}

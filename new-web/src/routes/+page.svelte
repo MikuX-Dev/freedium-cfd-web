@@ -18,7 +18,7 @@
 </svelte:head>
 
 <Header />
-<HomeBanner />
+<HomeBanner unlockedCount={data.unlockedCount} />
 
 <div class="section-head">
   <div class="left">

@@ -1,4 +1,4 @@
-import { recentPosts, randomPosts, type RecentPost } from "@/services";
+import { recentPosts, randomPosts, articleCount, type RecentPost } from "@/services";
 import type { BlogPost } from "$lib/types";
 import type { PageServerLoad } from "./$types";
 
@@ -92,6 +92,11 @@ function interleave(
 }
 
 export const load: PageServerLoad = async () => {
+	// Real "articles unlocked" count for the banner. Eager + resilient: the
+	// backend count is a fast estimated Mongo count; null on failure → the
+	// banner just hides the stat rather than showing a fake number.
+	const unlockedCount = await articleCount().catch(() => null);
+
 	const streamed = Promise.all([
 		recentPosts(FEED_LIMIT).catch(() => [] as RecentPost[]),
 		randomPosts(FEED_LIMIT).catch(() => [] as RecentPost[]),
@@ -120,5 +125,5 @@ export const load: PageServerLoad = async () => {
 		};
 	});
 
-	return { streamed };
+	return { streamed, unlockedCount };
 };

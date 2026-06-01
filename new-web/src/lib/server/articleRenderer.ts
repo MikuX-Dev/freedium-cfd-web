@@ -98,7 +98,17 @@ function safeCodeToHtml(
 		return highlighter.codeToHtml(code, { ...options, lang } as Parameters<typeof highlighter.codeToHtml>[1]);
 	} catch (e) {
 		if (e instanceof Error && (e.name === "ShikiError" || e.message?.includes("Language"))) {
-			return highlighter.codeToHtml(code, { ...options, lang: "text" } as Parameters<typeof highlighter.codeToHtml>[1]);
+			// Degrade gracefully rather than crashing the whole article render.
+			// Two known ShikiError causes: an unsupported language, and
+			// "Decorations … intersect" (Medium markup with overlapping
+			// bold/italic ranges in a code block). Drop the decorations first
+			// (keeps language highlighting), then fall back to plain "text".
+			const { decorations: _dropped, ...noDecorations } = options;
+			try {
+				return highlighter.codeToHtml(code, { ...noDecorations, lang } as Parameters<typeof highlighter.codeToHtml>[1]);
+			} catch {
+				return highlighter.codeToHtml(code, { ...noDecorations, lang: "text" } as Parameters<typeof highlighter.codeToHtml>[1]);
+			}
 		}
 		throw e;
 	}
@@ -176,6 +186,21 @@ function rehypeHighlight(opts: { mode: RenderMode } = { mode: "web" }) {
 							}))
 							// Filter out invalid decorations where start >= end
 							.filter((d: any) => d.start < d.end);
+
+							// Shiki throws "Decorations … intersect" on overlapping
+							// ranges — Medium's markup sometimes nests/overlaps
+							// bold+italic. Keep them sorted and drop any that overlap
+							// a previously-kept one so the render never crashes.
+							decorations.sort((a, b) => a.start - b.start);
+							const deconflicted: typeof decorations = [];
+							let lastEnd = -1;
+							for (const d of decorations) {
+								if (d.start >= lastEnd) {
+									deconflicted.push(d);
+									lastEnd = d.end;
+								}
+							}
+							decorations = deconflicted;
 						} catch (e) {
 							console.error('Failed to parse decorations:', e);
 						}

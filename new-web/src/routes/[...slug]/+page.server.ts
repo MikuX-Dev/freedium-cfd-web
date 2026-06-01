@@ -37,7 +37,10 @@ export const load: PageServerLoad = async ({ params, request }) => {
 		};
 	}).catch((err: unknown) => {
 		const message = (err as Error)?.message ?? "";
-		if (message === "ARTICLE_NOT_FOUND") {
+		// A backend 404 (post not found, OR a transient WARP soft-block that
+		// exhausted retries) should surface as 404 with the branded
+		// not-found card — not a scary 500.
+		if (message === "ARTICLE_NOT_FOUND" || message === "UPSTREAM_404") {
 			recordArticleFetch("not_found");
 			return {
 				html: null as string | null,

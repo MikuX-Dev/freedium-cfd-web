@@ -8,9 +8,10 @@ from freedium_library.services.recent_posts import (
 )
 from freedium_library.services.recent_posts.container import RecentPostsContainer
 
-# Cheap in-process cache for the all-time unlocked-article count so the home
-# page doesn't hit Mongo on every load. {value, at} with a 120s TTL.
-_COUNT_CACHE: dict[str, float] = {"value": 0, "at": 0.0}
+# All-time unlocked-article count. Refreshed into Redis by the
+# refresh_article_count scheduled task (tasks/article_count.py), so this
+# endpoint is just a Redis GET shared across all workers.
+_ARTICLE_COUNT_KEY = "freedium:article_count"
 _count_client = None
 
 
@@ -31,18 +32,27 @@ def _post_cache_collection():
 
 
 async def _unlocked_count() -> int:
-    import time
+    """Read the count from Redis (kept warm by refresh_article_count). Cold
+    fallback before the first scheduled run: compute from Mongo once and seed
+    Redis. Degrades to 0 (→ the banner hides the stat), never 500s."""
+    import os
 
-    now = time.time()
-    if _COUNT_CACHE["value"] and now - _COUNT_CACHE["at"] < 120:
-        return int(_COUNT_CACHE["value"])
+    from redis.asyncio import Redis
+
+    r = Redis.from_url(
+        os.environ.get("REDIS_URL", "redis://localhost:6379/0"), decode_responses=True
+    )
     try:
-        n = await _post_cache_collection().estimated_document_count()
-        _COUNT_CACHE["value"] = n
-        _COUNT_CACHE["at"] = now
-        return int(n)
-    except Exception:  # noqa: BLE001 — degrade to last-known / 0, never 500
-        return int(_COUNT_CACHE["value"])
+        cached = await r.get(_ARTICLE_COUNT_KEY)
+        if cached is not None:
+            return int(cached)
+        n = int(await _post_cache_collection().estimated_document_count())
+        await r.setex(_ARTICLE_COUNT_KEY, 900, n)  # 900s backstop vs a stuck scheduler
+        return n
+    except Exception:  # noqa: BLE001
+        return 0
+    finally:
+        await r.aclose()
 
 
 @beartype

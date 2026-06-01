@@ -5,6 +5,19 @@ http:
   # plain HTTP to this Traefik on host port 18080. Dev hostnames
   # (*.localhost) remain so local docker compose up still works.
   routers:
+    # Block /cdn-cgi/* (Cloudflare probe paths bots scan for) at the edge of
+    # the stack — highest priority so it wins over every other route. The
+    # block-cdn-cgi middleware (an ipAllowList with an impossible source)
+    # rejects with 403 before anything is forwarded to web/backend.
+    cdn-cgi-block:
+      rule: "PathPrefix(`/cdn-cgi/`)"
+      priority: 1000
+      entryPoints:
+        - web
+      service: web  # required, but the middleware denies before forwarding
+      middlewares:
+        - block-cdn-cgi
+
     # freedium.cfd is 301-redirected to freedium-mirror.cfd by the edge
     # HAProxy at 146.103.108.112 — Traefik only ever sees the canonical
     # domain, so we don't need it in the Host() match.
@@ -39,6 +52,16 @@ http:
       entryPoints:
         - web
       service: api@internal
+
+  middlewares:
+    # Deny everything: an ipAllowList whose only allowed source is an
+    # impossible address, so every real request to /cdn-cgi/* gets 403.
+    # (Traefik OSS has no native "return 403" middleware; this is the
+    # idiomatic way to block a path.)
+    block-cdn-cgi:
+      ipAllowList:
+        sourceRange:
+          - "255.255.255.255/32"
 
   services:
     web:

@@ -29,3 +29,4 @@ scheduler = TaskiqScheduler(
 # This must come AFTER broker is defined (tasks reference it).
 from freedium_library.tasks import cache as _cache  # noqa: E402, F401
 from freedium_library.tasks import random_posts as _random_posts  # noqa: E402, F401
+from freedium_library.tasks import article_count as _article_count  # noqa: E402, F401

@@ -128,3 +128,26 @@ def test_svg_content_type_is_rejected(monkeypatch):
     res = _client().get("/img/700/0*abc")
     assert res.status_code == 502
     assert backend.put_calls == []  # never cached
+
+
+def test_retina_at2x_image_id_is_accepted(monkeypatch):
+    """Medium retina ids contain '@' (e.g. '...@2x.jpeg', common for author
+    avatars). Regression for the 400 'invalid image id' bug."""
+    backend = _FakeBackend(get_result=(b"\xff\xd8\xff", "image/jpeg"))
+    monkeypatch.setattr(images, "_get_backend", lambda: backend)
+
+    res = _client().get("/img/700/1*OvL-lQO-0x15jAockFDYWQ@2x.jpeg")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "image/jpeg"
+
+
+def test_id_regex_accepts_retina_but_rejects_traversal_and_scheme():
+    """The id allowlist permits Medium ids (incl. '@2x') but never a path
+    traversal, a scheme, a bare slash, an empty id, or a leading '@'."""
+    assert images._ID_RE.match("1*OvL-lQO-0x15jAockFDYWQ@2x.jpeg")
+    assert images._ID_RE.match("0*abcDEF_-.")
+    assert not images._ID_RE.match("../etc/passwd")
+    assert not images._ID_RE.match("http://evil/x")
+    assert not images._ID_RE.match("a/b")
+    assert not images._ID_RE.match("")
+    assert not images._ID_RE.match("@leading")

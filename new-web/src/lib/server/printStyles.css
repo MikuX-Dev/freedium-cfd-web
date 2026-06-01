@@ -52,9 +52,17 @@
 .prose-print pre {
     background: #f6f8fa; border: 0.5pt solid #e0e0e0; border-radius: 4pt;
     padding: 0.3cm; font: 9pt/1.5 'Consolas', monospace;
-    white-space: pre-wrap; word-wrap: break-word;
     page-break-inside: avoid;
 }
+.prose-print pre,
+.prose-print pre code,
+.prose-print pre .line,
+.prose-print pre span {
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.prose-print pre { max-width: 100%; overflow: hidden; }
 .prose-print pre code { background: transparent; padding: 0; }
 .prose-print code {
     font: 0.92em 'Consolas', monospace;

@@ -1342,6 +1342,12 @@ class MediumMarkdownRenderer:
         metadata["reading_time"] = meta.reading_time
         metadata["url"] = meta.medium_url
 
+        if meta.first_published_at:
+            metadata["first_published_at"] = meta.first_published_at  # epoch ms
+        if meta.updated_at:
+            metadata["updated_at"] = meta.updated_at
+        metadata["is_locked"] = meta.is_locked
+
         if meta.tags:
             metadata["tags"] = meta.tags
 

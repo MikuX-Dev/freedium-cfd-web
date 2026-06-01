@@ -354,6 +354,9 @@ export interface ArticleMetadata {
 	subtitle?: string;
 	author: { name: string; avatar: string; role: string };
 	date: string;
+	publishedAt: string | null;
+	updatedAt: string | null;
+	isFree: boolean | null;
 	postImage: string | null;
 	postImageZoom: string | null;
 	postImageCaption?: string;
@@ -480,7 +483,17 @@ export async function renderArticle(
 			title: metadata.title || "Untitled",
 			subtitle: metadata.subtitle || undefined,
 			author,
-			date: new Date().toISOString(),
+			date: metadata.first_published_at
+				? new Date(metadata.first_published_at).toISOString()
+				: new Date().toISOString(),
+			publishedAt: metadata.first_published_at
+				? new Date(metadata.first_published_at).toISOString()
+				: null,
+			updatedAt: metadata.updated_at
+				? new Date(metadata.updated_at).toISOString()
+				: null,
+			isFree:
+				typeof metadata.is_locked === "boolean" ? !metadata.is_locked : null,
 			postImage,
 			postImageZoom,
 			postImageCaption: postImageCaption || undefined,

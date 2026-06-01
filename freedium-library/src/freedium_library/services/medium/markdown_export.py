@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import httpx
 import yaml
@@ -93,6 +94,22 @@ async def _inline_images_as_base64_markdown(markdown: str) -> str:
     return out
 
 
+def _iso_date(ms: int | None) -> str | None:
+    return (
+        datetime.fromtimestamp(ms / 1000, tz=timezone.utc).date().isoformat()
+        if ms
+        else None
+    )
+
+
+def _human_date(ms: int | None) -> str | None:
+    return (
+        datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%b %d, %Y")
+        if ms
+        else None
+    )
+
+
 @beartype
 def _slugify(title: str | None, fallback: str = "article") -> str:
     if not title:
@@ -119,6 +136,13 @@ def _build_frontmatter(
     tags = [t for t in metadata.tags if t]
     if tags:
         data["tags"] = tags
+    published = _iso_date(metadata.first_published_at)
+    if published:
+        data["published"] = published
+    updated = _iso_date(metadata.updated_at)
+    if updated and updated != published:
+        data["updated"] = updated
+    data["free"] = not metadata.is_locked
     if freedium_url:
         data["freedium_url"] = freedium_url
     if source_url:
@@ -144,6 +168,18 @@ def _build_heading(metadata: PostMetadata) -> str:
     if metadata.subtitle:
         lines.append("")
         lines.append(f"*{metadata.subtitle}*")
+
+    published = _human_date(metadata.first_published_at)
+    updated = _human_date(metadata.updated_at)
+    meta_parts: list[str] = []
+    if published:
+        meta_parts.append(f"Published {published}")
+    if updated and updated != published:
+        meta_parts.append(f"Updated {updated}")
+    meta_parts.append(f"Free: {'No' if metadata.is_locked else 'Yes'}")
+    if lines:
+        lines.append("")
+    lines.append(f"*{' · '.join(meta_parts)}*")
     return "\n".join(lines) + "\n\n" if lines else ""
 
 

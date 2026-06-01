@@ -26,16 +26,19 @@ function escapeHtml(s: string): string {
         .replace(/'/g, "&#39;");
 }
 
+function fmtDate(iso: string | null): string {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return isNaN(d.getTime())
+        ? ""
+        : d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
 function renderCover(article: ArticleMetadata): string {
     if (!article.postImage) return "";
-    const date = new Date(article.date);
-    const dateStr = isNaN(date.getTime())
-        ? ""
-        : date.toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-          });
+    const publishedStr = fmtDate(article.publishedAt ?? article.date);
+    const updatedStr = article.updatedAt ? fmtDate(article.updatedAt) : "";
+    const showUpdated = updatedStr !== "" && updatedStr !== publishedStr;
     return `
     <section class="cover">
         <img class="cover-image" src="${escapeHtml(article.postImage)}" alt=""/>
@@ -44,7 +47,9 @@ function renderCover(article: ArticleMetadata): string {
             ${article.subtitle ? `<p class="cover-subtitle">${escapeHtml(article.subtitle)}</p>` : ""}
             <div class="cover-meta">
                 <p><strong>${escapeHtml(article.author.name)}</strong></p>
-                ${dateStr ? `<p>${escapeHtml(dateStr)}</p>` : ""}
+                ${publishedStr ? `<p>Published ${escapeHtml(publishedStr)}</p>` : ""}
+                ${showUpdated ? `<p>Updated ${escapeHtml(updatedStr)}</p>` : ""}
+                ${article.isFree !== null ? `<p>Free: ${article.isFree ? "Yes" : "No"}</p>` : ""}
                 ${article.url ? `<p><a href="${escapeHtml(freediumUrl(article.url))}">Read on Freedium</a> · <a href="${escapeHtml(article.url)}">original</a></p>` : ""}
             </div>
         </div>

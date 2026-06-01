@@ -137,7 +137,7 @@ async def _build_download(
     # / relative proxy URLs).
     markdown = await _inline_images_as_base64_markdown(markdown)
     resolved = await resolve_gists_in_markdown(markdown, mode=_GIST_MODE)
-    source_url = getattr(metadata, "medium_url", "") or url
+    source_url = metadata.medium_url or url
     freedium_link = f"{_PUBLIC_URL}/{source_url}"
     body = (
         _build_frontmatter(metadata, freedium_url=freedium_link, source_url=source_url)

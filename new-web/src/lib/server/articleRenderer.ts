@@ -404,11 +404,11 @@ export interface RenderResult {
 
 export async function renderArticle(
 	slug: string,
-	options: { mode?: RenderMode } = {},
+	options: { mode?: RenderMode; clientUa?: string } = {},
 ): Promise<RenderResult> {
 	const mode = options.mode ?? "web";
 
-	const renderResult = await render(slug, true);
+	const renderResult = await render(slug, true, options.clientUa);
 	if (!renderResult) throw new Error("ARTICLE_NOT_FOUND");
 
 	let article: ArticleMetadata | null = null;

@@ -9,13 +9,14 @@ import type { PageServerLoad } from "./$types";
  * user sees the page instantly (<100 ms TTFB) even on a cold cache
  * where the backend takes 30–90 s to render a large article.
  */
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, request }) => {
 	const start = performance.now();
+	const clientUa = request.headers.get("User-Agent") ?? "";
 
 	// Fire-and-forget: SvelteKit unwraps this promise and streams
 	// the resolved data. The page component uses {#await} to show
 	// a skeleton while this is pending.
-	const streamed = renderArticle(params.slug).then((result) => {
+	const streamed = renderArticle(params.slug, { clientUa }).then((result) => {
 		const renderTimeMs = Math.round(performance.now() - start);
 		recordArticleFetch("success");
 		return {

@@ -44,13 +44,19 @@ async function pollTask(taskId: string, maxWaitMs = 180_000): Promise<RenderResp
 	throw new Error("RENDER_ERROR: timed out waiting for render");
 }
 
-export async function render(content: string, frontmatter = false): Promise<RenderResponse> {
+export async function render(
+	content: string,
+	frontmatter = false,
+	clientUa = "",
+): Promise<RenderResponse> {
 	let response: RenderApiResponse | undefined;
 	try {
+		const headers: Record<string, string> = { "Content-Type": "application/json" };
+		if (clientUa) headers["X-Client-UA"] = clientUa;
 		response = await apiFetch<RenderApiResponse>("/render", {
 			method: "POST",
 			body: JSON.stringify({ content, frontmatter }),
-			headers: { "Content-Type": "application/json" },
+			headers,
 		});
 	} catch (err: unknown) {
 		const status =

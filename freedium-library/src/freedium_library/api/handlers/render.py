@@ -129,7 +129,12 @@ async def render_universal(
         HTTPException 404: If no service can handle the content
         HTTPException 500: If rendering fails
     """
-    client_ua = http_request.headers.get("User-Agent", "")
+    # The real browser/bot UA, forwarded by SvelteKit SSR as X-Client-UA.
+    # Falls back to the direct User-Agent header (covers internal/testing
+    # calls that bypass the web tier).
+    client_ua = http_request.headers.get(
+        "X-Client-UA", http_request.headers.get("User-Agent", "")
+    )
     t0 = time.perf_counter()
 
     # --- L2: rendered-output cache ---

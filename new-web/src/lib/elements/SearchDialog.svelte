@@ -70,7 +70,14 @@
 	const defaultImageUrl = 'https://via.placeholder.com/50';
 </script>
 
-<Command.Dialog bind:open bind:value shouldFilter={false} loop>
+<Command.Dialog
+	bind:open
+	bind:value
+	shouldFilter={false}
+	loop
+	title="Search"
+	description="Search Freedium posts"
+>
 	<Command.Input placeholder="Search posts..." bind:value={searchQuery} />
 	<Command.List>
 		<!-- <Command.Empty>No posts found. Try a different search term.</Command.Empty> -->

@@ -15,7 +15,12 @@ from freedium_library.utils.http.client.config import (
 
 from .api import MediumApiService
 from .config import MediumConfig
+from .markdown_export import MarkdownExportService
 from .medium import MediumService
+
+
+def _public_url_from_env() -> str:
+    return os.environ.get("FREEDIUM_PUBLIC_URL", "https://freedium-mirror.cfd").rstrip("/")
 
 
 def _proxy_from_env() -> Optional[RequestProxyConfig]:
@@ -90,4 +95,12 @@ class MediumContainer(containers.DeclarativeContainer):
         request=request,
         api_service=api_service,
         path_validator=validator,
+    )
+
+    public_url = providers.Callable(_public_url_from_env)
+    markdown_export = providers.Singleton(
+        MarkdownExportService,
+        medium_service=service,
+        public_url=public_url,
+        gist_mode="raw",
     )

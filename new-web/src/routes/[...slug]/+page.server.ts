@@ -3,20 +3,28 @@ import { recordArticleFetch } from "$lib/server/metrics";
 import type { PageServerLoad } from "./$types";
 
 /**
- * Return the render result as a promise so SvelteKit streams the page:
- * the loading skeleton arrives in the first HTML chunk, the rendered
- * article body arrives later when the backend finishes. This means the
- * user sees the page instantly (<100 ms TTFB) even on a cold cache
- * where the backend takes 30–90 s to render a large article.
+ * Render-race: we start the render, then wait up to EAGER_BUDGET_MS for it.
+ *
+ *  - If it resolves in time (the common case — L2 cache hits are sub-second),
+ *    we return the FULL result eagerly, so the initial HTML contains the
+ *    article body. External "save it" / reader apps and crawlers that grab
+ *    the first response therefore get real content, not a skeleton.
+ *  - If it doesn't (a genuinely cold render, 10–90 s through WARP), we fall
+ *    back to streaming: the skeleton arrives instantly and the body streams
+ *    in later. Humans never stare at a blank page.
+ *
+ * Popular articles (the ones people save) are almost always cached, so they
+ * win the race → full HTML. Content-based, no bot-UA guessing.
  */
+const EAGER_BUDGET_MS = 2500;
+
 export const load: PageServerLoad = async ({ params, request }) => {
 	const start = performance.now();
 	const clientUa = request.headers.get("User-Agent") ?? "";
 
-	// Fire-and-forget: SvelteKit unwraps this promise and streams
-	// the resolved data. The page component uses {#await} to show
-	// a skeleton while this is pending.
-	const streamed = renderArticle(params.slug, { clientUa }).then((result) => {
+	// This promise never rejects — the .catch below maps every failure to a
+	// uniform result shape (with an `error` field).
+	const renderPromise = renderArticle(params.slug, { clientUa }).then((result) => {
 		const renderTimeMs = Math.round(performance.now() - start);
 		recordArticleFetch("success");
 		return {
@@ -63,8 +71,19 @@ export const load: PageServerLoad = async ({ params, request }) => {
 		};
 	});
 
-	return {
-		slug: params.slug,
-		streamed,
-	};
+	// Race the render against the eager budget.
+	const TIMED_OUT = Symbol("timed-out");
+	const winner = await Promise.race([
+		renderPromise,
+		new Promise<typeof TIMED_OUT>((resolve) =>
+			setTimeout(() => resolve(TIMED_OUT), EAGER_BUDGET_MS).unref?.(),
+		),
+	]);
+
+	if (winner !== TIMED_OUT) {
+		// Fast (cache hit / quick render) → full HTML in the initial response.
+		return { slug: params.slug, eager: winner, streamed: null };
+	}
+	// Cold → stream the skeleton, body arrives when renderPromise resolves.
+	return { slug: params.slug, eager: null, streamed: renderPromise };
 };

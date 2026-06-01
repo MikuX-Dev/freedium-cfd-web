@@ -125,11 +125,15 @@ function createCodeCopyButton(code: string, toggleMs: number = 3000): string {
 		{
 			"data-code": code,
 			"data-toggle-ms": toggleMs,
+			"aria-label": "Copy code",
+			// data-nosnippet: keep this control out of page-saver / reader-mode
+			// extraction so it doesn't pollute the saved article text.
+			"data-nosnippet": "",
 			class: `code-copy-btn absolute right-3 ${positionClass} size-8 p-1.5 flex items-center justify-center bg-black/50 text-white rounded-md transition-colors duration-200 cursor-pointer hover:bg-black/70`,
 		},
 		[
-			h("span", { class: "ready block" }, clipboardIcon ? [clipboardIcon] : []),
-			h("span", { class: "success hidden" }, clipboardCheckIcon ? [clipboardCheckIcon] : []),
+			h("span", { class: "ready block", "aria-hidden": "true" }, clipboardIcon ? [clipboardIcon] : []),
+			h("span", { class: "success hidden", "aria-hidden": "true" }, clipboardCheckIcon ? [clipboardCheckIcon] : []),
 		],
 	);
 

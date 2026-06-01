@@ -118,7 +118,9 @@
 
 <svelte:head>
 	<title>{error ? 'Freedium' : data?.article?.title || 'Freedium'} - Freedium</title>
-	<meta name="description" content="Read about the latest updates to UploadThing" />
+	{#if article?.subtitle}
+		<meta name="description" content={article.subtitle} />
+	{/if}
 </svelte:head>
 
 <Header />
@@ -173,7 +175,9 @@
 				</article>
 			{:else if article}
 				<article class="overflow-hidden bg-white rounded-lg shadow-lg dark:bg-zinc-900">
-					<ArticleActions originalUrl={article.url} title={article.title} />
+					<div data-nosnippet style="display: contents">
+						<ArticleActions originalUrl={article.url} title={article.title} />
+					</div>
 					{#if article.postImage}
 						<ImageZoom
 							src={article.postImage}
@@ -232,6 +236,7 @@
 						<!-- Row 2: Contents accordion (own row, collapsed by default) -->
 						{#if toc.length > 0}
 							<div
+								data-nosnippet
 								class="mt-4 overflow-hidden border rounded-lg border-gray-200 dark:border-zinc-700"
 							>
 								<button
@@ -300,7 +305,7 @@
 							{/if}
 						</div>
 					</div>
-					<div class="border-t border-gray-200 dark:border-zinc-700">
+					<div data-nosnippet class="border-t border-gray-200 dark:border-zinc-700">
 						<ArticleActions originalUrl={article.url} title={article.title} />
 					</div>
 				</article>

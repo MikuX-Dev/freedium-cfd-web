@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from beartype import beartype
 from dependency_injector.wiring import Provide, inject
@@ -7,7 +8,7 @@ from fastapi.responses import PlainTextResponse
 from loguru import logger
 from pydantic import BaseModel
 
-from freedium_library.api.error_log import log_errored_link
+from freedium_library.api.error_log import log_errored_link, log_successful_render
 from freedium_library.api.metrics import (
     ARTICLE_RENDER,
     RENDERED_CACHE_HITS,
@@ -98,11 +99,14 @@ async def render_medium_post(
                 content, metadata = await medium_service.arender_with_metadata(post_id)
 
             await _record_recent(request, metadata)
+            client_ua = request.headers.get("User-Agent", "") if request else ""
+            log_successful_render(post_id, "inline", client_ua)
             return PlainTextResponse(content=content, media_type="text/markdown")
 
         except InvalidMediumServicePathError as e:
             ctx.set_outcome("parser_failure")
-            log_errored_link(post_id, "parser_failure", None, str(e))
+            client_ua = request.headers.get("User-Agent", "") if request else ""
+            log_errored_link(post_id, "parser_failure", None, str(e), client_ua=client_ua)
             raise HTTPException(status_code=404, detail=str(e)) from e
 
 
@@ -125,6 +129,9 @@ async def render_universal(
         HTTPException 404: If no service can handle the content
         HTTPException 500: If rendering fails
     """
+    client_ua = http_request.headers.get("User-Agent", "")
+    t0 = time.perf_counter()
+
     # --- L2: rendered-output cache ---
     import json as _json
 
@@ -136,10 +143,15 @@ async def render_universal(
                 data = _json.loads(cached.value)
                 RENDERED_CACHE_HITS.inc()
                 has_embedded = "data:image" in data["markdown"]
+                cache_status = f"l2_hit_{'embedded' if has_embedded else 'cdn'}"
+                log_successful_render(
+                    request.content, cache_status, client_ua,
+                    render_ms=(time.perf_counter() - t0) * 1000,
+                )
                 return RenderResponse(
                     markdown=data["markdown"],
                     service=data["service"],
-                    cache_status=f"l2_hit_{'embedded' if has_embedded else 'cdn'}",
+                    cache_status=cache_status,
                 )
         except Exception:
             pass  # treat L2 read failure as a miss
@@ -196,7 +208,13 @@ async def render_universal(
             except Exception:
                 pass  # broker down — fall through silently
 
-        return RenderResponse(markdown=markdown, service=service_name)
+        log_successful_render(
+            request.content, "inline", client_ua,
+            render_ms=(time.perf_counter() - t0) * 1000,
+        )
+        return RenderResponse(
+            markdown=markdown, service=service_name, cache_status="inline"
+        )
 
     with track_render(ARTICLE_RENDER) as ctx:
         try:
@@ -220,11 +238,11 @@ async def render_universal(
                     return await _render_inline(timeout=None)
                 except (ServiceResolutionError, InvalidMediumServicePathError) as e:
                     ctx.set_outcome("parser_failure")
-                    log_errored_link(request.content, "parser_failure", None, str(e))
+                    log_errored_link(request.content, "parser_failure", None, str(e), client_ua=client_ua)
                     raise HTTPException(status_code=404, detail=str(e)) from e
                 except Exception as e:
                     ctx.set_outcome("network_error")
-                    log_errored_link(request.content, "network_error", None, str(e))
+                    log_errored_link(request.content, "network_error", None, str(e), client_ua=client_ua)
                     raise HTTPException(
                         status_code=500,
                         detail=f"Error rendering content: {str(e)}",
@@ -238,15 +256,15 @@ async def render_universal(
 
         except ServiceResolutionError as e:
             ctx.set_outcome("parser_failure")
-            log_errored_link(request.content, "parser_failure", None, str(e))
+            log_errored_link(request.content, "parser_failure", None, str(e), client_ua=client_ua)
             raise HTTPException(status_code=404, detail=str(e)) from e
         except InvalidMediumServicePathError as e:
             ctx.set_outcome("parser_failure")
-            log_errored_link(request.content, "parser_failure", None, str(e))
+            log_errored_link(request.content, "parser_failure", None, str(e), client_ua=client_ua)
             raise HTTPException(status_code=404, detail=str(e)) from e
         except Exception as e:
             ctx.set_outcome("network_error")
-            log_errored_link(request.content, "network_error", None, str(e))
+            log_errored_link(request.content, "network_error", None, str(e), client_ua=client_ua)
             raise HTTPException(
                 status_code=500,
                 detail=f"Error rendering content: {str(e)}",

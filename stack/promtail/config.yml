@@ -56,3 +56,24 @@ scrape_configs:
       # Write a clean JSON line back so the URL stays queryable via |=
       - output:
           source: extra
+
+  - job_name: freedium-rendered-links
+    static_configs:
+      - targets: ["localhost"]
+        labels:
+          job: freedium
+          source: rendered_links
+          __path__: /var/log/freedium/rendered-links.jsonl
+
+    pipeline_stages:
+      # Flat JSON — one object per line, no loguru wrapping.
+      - json:
+          expressions:
+            url: url
+            host: host
+            cache: cache
+            render_ms: render_ms
+            client_ua: client_ua
+      - labels:
+          host:
+          cache:

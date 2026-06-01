@@ -19,8 +19,10 @@ from freedium_library.utils.cache.db.image_cache import ImageCacheBackend
 
 # Widths we actually emit (feed covers 800/1400; article body 700/2000/4000).
 _ALLOWED_WIDTHS = {700, 800, 1400, 2000, 4000}
-# Medium image ids: alphanumeric, '*', '.', '-', '_'. Never a slash/scheme.
-_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._*-]{0,200}$")
+# Medium image ids: alphanumeric, '*', '.', '-', '_', and '@' (retina
+# suffix like "@2x"). Never a slash/scheme; '@' sits in the URL path after
+# the hardcoded host, so it can't act as a userinfo separator.
+_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._*@-]{0,200}$")
 _MAX_BYTES = 15 * 1024 * 1024  # don't cache images larger than ~15MB
 
 # Strict raster allowlist. We serve these bytes from OUR origin, so an

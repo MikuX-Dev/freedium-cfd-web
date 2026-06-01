@@ -30,6 +30,12 @@
         "name": "url",
         "type": "textbox",
         "current": { "text": "", "value": "" }
+      },
+      {
+        "name": "client_ua",
+        "type": "textbox",
+        "label": "Client UA filter",
+        "current": { "text": "", "value": "" }
       }
     ]
   },
@@ -131,6 +137,95 @@
         "refId": "A"
       }],
       "options": { "showTime": true, "wrapLogMessage": true }
+    },
+
+    {
+      "id": 11, "type": "stat", "title": "Cache hit ratio (5m)",
+      "gridPos": { "x": 0, "y": 30, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=~\"l2_hit.*\" [$__range])) / sum(count_over_time({source=\"rendered_links\"} | json [$__range]))",
+        "refId": "A"
+      }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+    },
+    {
+      "id": 12, "type": "stat", "title": "Successful renders / min",
+      "gridPos": { "x": 6, "y": 30, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(count_over_time({source=\"rendered_links\"} | json | client_ua=~\"$client_ua\" [1m]))",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 13, "type": "timeseries", "title": "Successful render rate",
+      "gridPos": { "x": 12, "y": 30, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=\"l2_hit_cdn\" [5m]))",
+          "legendFormat": "L2 cache hit (cdn)", "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=\"l2_hit_embedded\" [5m]))",
+          "legendFormat": "L2 cache hit (embedded)", "refId": "B"
+        },
+        {
+          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=\"inline\" [5m]))",
+          "legendFormat": "Inline render", "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 14, "type": "table", "title": "Top Client UAs (1h)",
+      "gridPos": { "x": 0, "y": 38, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "topk(10, sum by (client_ua) (count_over_time({source=\"rendered_links\"} | json | client_ua != \"\" [1h])))",
+        "refId": "A"
+      }],
+      "transformations": [
+        { "id": "renameByRegex", "options": { "regex": "Value #A", "rename": "Count" } }
+      ]
+    },
+    {
+      "id": 15, "type": "logs", "title": "Recent successful renders",
+      "gridPos": { "x": 12, "y": 38, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "{source=\"rendered_links\"} | json | client_ua=~\"$client_ua\"",
+        "refId": "A"
+      }],
+      "options": { "showTime": true, "wrapLogMessage": false, "dedupStrategy": "none" }
+    },
+    {
+      "id": 16, "type": "logs", "title": "Render trace — by article URL ($url)",
+      "gridPos": { "x": 0, "y": 46, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "{source=\"rendered_links\"} | json | url=~\"(?i).*$url.*\"",
+          "refId": "R"
+        },
+        {
+          "expr": "{job=\"freedium\",source=\"errored_links\"} |= \"$url\"",
+          "refId": "E"
+        }
+      ],
+      "options": { "showTime": true, "wrapLogMessage": true, "dedupStrategy": "none" }
+    },
+    {
+      "id": 17, "type": "logs", "title": "UA search across all render logs",
+      "gridPos": { "x": 12, "y": 46, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "{source=\"rendered_links\"} | json | client_ua=~\"(?i).*$client_ua.*\"",
+          "refId": "A"
+        }
+      ],
+      "options": { "showTime": true, "wrapLogMessage": false, "dedupStrategy": "none" }
     }
   ]
 }

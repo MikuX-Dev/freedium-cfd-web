@@ -100,9 +100,12 @@ def _yaml_quote(value: str) -> str:
 
 
 @beartype
-def _build_frontmatter(metadata: PostMetadata) -> str:
-    """YAML frontmatter with title, subtitle, tags. Skips empty fields so
-    consumers don't see `subtitle: ""` for articles that don't have one."""
+def _build_frontmatter(
+    metadata: PostMetadata, freedium_url: str = "", source_url: str = ""
+) -> str:
+    """YAML frontmatter with title, subtitle, tags, and source links. Skips
+    empty fields so consumers don't see `subtitle: ""` for articles that
+    don't have one."""
     lines: list[str] = ["---"]
     if metadata.title:
         lines.append(f"title: {_yaml_quote(metadata.title)}")
@@ -112,6 +115,10 @@ def _build_frontmatter(metadata: PostMetadata) -> str:
     rendered_tags = [_yaml_quote(t) for t in tags]
     if rendered_tags:
         lines.append(f"tags: [{', '.join(rendered_tags)}]")
+    if freedium_url:
+        lines.append(f"freedium_url: {_yaml_quote(freedium_url)}")
+    if source_url:
+        lines.append(f"source_url: {_yaml_quote(source_url)}")
     lines.append("---")
     lines.append("")
     return "\n".join(lines)
@@ -130,10 +137,13 @@ async def _build_download(
     # / relative proxy URLs).
     markdown = await _inline_images_as_base64_markdown(markdown)
     resolved = await resolve_gists_in_markdown(markdown, mode=_GIST_MODE)
-    source_url = (getattr(metadata, "medium_url", "") or url)
+    source_url = getattr(metadata, "medium_url", "") or url
     freedium_link = f"{_PUBLIC_URL}/{source_url}"
-    link_block = f"> 📖 Read on Freedium: {freedium_link}\n>\n> 🔗 Original: {source_url}\n"
-    body = _build_frontmatter(metadata) + "\n" + link_block + "\n" + resolved
+    body = (
+        _build_frontmatter(metadata, freedium_url=freedium_link, source_url=source_url)
+        + "\n"
+        + resolved
+    )
     filename = f"{_slugify(metadata.title)}.md"
     return body, filename
 

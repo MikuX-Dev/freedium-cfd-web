@@ -17,6 +17,17 @@ http:
       service: web  # required, but the middleware denies before forwarding
       middlewares:
         - block-cdn-cgi
+    # Leftover static asset from the old Caddy deployment. Bots/crawlers
+    # still request it. Block at the edge so it never hits web.
+    tailwind-hotfix-block:
+      rule: "Path(`/tailwindcssv3-freedium-hotfix.js`)"
+      priority: 1000
+      entryPoints:
+        - web
+      service: web
+      middlewares:
+        - block-cdn-cgi
+
 
     # freedium.cfd is 301-redirected to freedium-mirror.cfd by the edge
     # HAProxy at 146.103.108.112 — Traefik only ever sees the canonical

@@ -10,6 +10,7 @@
  * by the raw pathname would explode cardinality on Freedium because
  * every Medium URL becomes its own pathname.
  */
+import { clientUaStore } from "$lib/server/client-ua";
 import type { Handle } from "@sveltejs/kit";
 import { registry, recordHttp } from "$lib/server/metrics";
 
@@ -25,10 +26,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 	}
 
+	// Stash the real browser/bot User-Agent for the duration of this
+	// SSR request so apiFetch can forward it to the backend — the
+	// backend logs it as client_ua in rendered-links / errored-links.
+	const ua = event.request.headers?.get("User-Agent") ?? "";
+
 	const start = performance.now();
 	let status = 500;
 	try {
-		const response = await resolve(event);
+		const response = await clientUaStore.run(ua, () => resolve(event));
 		status = response.status;
 		return response;
 	} finally {

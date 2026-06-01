@@ -44,6 +44,9 @@ ARTICLE_RENDER = _MetricPair(
     histogram=Histogram(
         "freedium_article_render_duration_seconds",
         "Article render latency in seconds.",
+        # Extend past 10s: cold renders (Medium fetch + render through WARP)
+        # take 10-90s. Default buckets top at 10, pinning p99 at the ceiling.
+        buckets=(0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120),
     ),
 )
 

@@ -5,204 +5,481 @@
   "editable": true,
   "graphTooltip": 1,
   "refresh": "30s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
         "name": "kind",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
         "query": "label_values(freedium_errored_links_total, kind)",
         "multi": true,
         "includeAll": true,
-        "current": { "text": "All", "value": "$__all" }
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
       },
       {
         "name": "host",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
         "query": "label_values(freedium_errored_links_total, host)",
         "multi": true,
         "includeAll": true,
-        "current": { "text": "All", "value": "$__all" }
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
       },
       {
         "name": "url",
         "type": "textbox",
-        "current": { "text": "", "value": "" }
+        "current": {
+          "text": "",
+          "value": ""
+        }
       },
       {
         "name": "client_ua",
         "type": "textbox",
         "label": "Client UA filter",
-        "current": { "text": "", "value": "" }
+        "current": {
+          "text": "",
+          "value": ""
+        }
       }
     ]
   },
   "panels": [
     {
-      "id": 1, "type": "stat", "title": "Total requests / min",
-      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\"}[1m]))*60", "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "short" } }
+      "id": 1,
+      "type": "stat",
+      "title": "Total requests / min",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\"}[1m]))*60",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
     },
     {
-      "id": 2, "type": "stat", "title": "Articles rendered / min",
-      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(rate(freedium_article_render_total{outcome=\"success\"}[1m]))*60", "refId": "A" }]
+      "id": 2,
+      "type": "stat",
+      "title": "Articles rendered / min",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(freedium_article_render_total{outcome=\"success\"}[1m]))*60",
+          "refId": "A"
+        }
+      ]
     },
     {
-      "id": 3, "type": "stat", "title": "Error rate (5m)",
-      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{
-        "expr": "sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\",status=~\"5..\"}[5m])) / sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\"}[5m]))",
-        "refId": "A"
-      }],
+      "id": 3,
+      "type": "stat",
+      "title": "Error rate (5m)",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\",status=~\"5..\"}[5m])) / sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\"}[5m]))",
+          "refId": "A"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red",   "value": 0.01 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.01
+              }
             ]
           }
         }
       }
     },
     {
-      "id": 4, "type": "stat", "title": "PDFs rendered / hour",
-      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(rate(freedium_pdf_render_total{outcome=\"success\"}[5m]))*3600", "refId": "A" }]
-    },
-    {
-      "id": 5, "type": "timeseries", "title": "HTTP latency (p50/p95/p99)",
-      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        { "expr": "histogram_quantile(0.50, sum by (le) (rate({__name__=~\"http_request_duration_seconds_bucket|freedium_web_http_request_duration_seconds_bucket\"}[5m])))", "legendFormat": "p50", "refId": "A" },
-        { "expr": "histogram_quantile(0.95, sum by (le) (rate({__name__=~\"http_request_duration_seconds_bucket|freedium_web_http_request_duration_seconds_bucket\"}[5m])))", "legendFormat": "p95", "refId": "B" },
-        { "expr": "histogram_quantile(0.99, sum by (le) (rate({__name__=~\"http_request_duration_seconds_bucket|freedium_web_http_request_duration_seconds_bucket\"}[5m])))", "legendFormat": "p99", "refId": "C" }
-      ]
-    },
-    {
-      "id": 6, "type": "timeseries", "title": "Article render latency",
-      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        { "expr": "histogram_quantile(0.50, sum by (le) (rate(freedium_article_render_duration_seconds_bucket[5m])))", "legendFormat": "p50", "refId": "A" },
-        { "expr": "histogram_quantile(0.95, sum by (le) (rate(freedium_article_render_duration_seconds_bucket[5m])))", "legendFormat": "p95", "refId": "B" }
-      ]
-    },
-    {
-      "id": 7, "type": "timeseries", "title": "Errored links by kind",
-      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{
-        "expr": "sum by (kind) (rate(freedium_errored_links_total{kind=~\"$kind\",host=~\"$host\"}[1m]))",
-        "legendFormat": "{{kind}}", "refId": "A"
-      }],
-      "fieldConfig": { "defaults": { "custom": { "stacking": { "mode": "normal" } } } }
-    },
-    {
-      "id": 8, "type": "barchart", "title": "Top errored hosts (1h)",
-      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{
-        "expr": "topk(10, sum by (host) (increase(freedium_errored_links_total[1h])))",
-        "refId": "A"
-      }]
-    },
-    {
-      "id": 9, "type": "logs", "title": "Recent errored URLs",
-      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 10 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "{job=\"freedium\",source=\"errored_links\",kind=~\"$kind\",host=~\"$host\"}",
-        "refId": "A"
-      }],
-      "options": { "showTime": true, "wrapLogMessage": true }
-    },
-    {
-      "id": 10, "type": "logs", "title": "Errored URL search ($url)",
-      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 10 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "{job=\"freedium\",source=\"errored_links\"} |= \"$url\"",
-        "refId": "A"
-      }],
-      "options": { "showTime": true, "wrapLogMessage": true }
-    },
-
-    {
-      "id": 11, "type": "stat", "title": "Cache hit ratio (5m)",
-      "gridPos": { "x": 0, "y": 30, "w": 6, "h": 4 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=~\"l2_hit.*\" [$__range])) / sum(count_over_time({source=\"rendered_links\"} | json [$__range]))",
-        "refId": "A"
-      }],
-      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
-    },
-    {
-      "id": 12, "type": "stat", "title": "Successful renders / min",
-      "gridPos": { "x": 6, "y": 30, "w": 6, "h": 4 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "sum(count_over_time({source=\"rendered_links\"} | json | client_ua=~\"$client_ua\" [1m]))",
-        "refId": "A"
-      }]
-    },
-    {
-      "id": 13, "type": "timeseries", "title": "Successful render rate",
-      "gridPos": { "x": 12, "y": 30, "w": 12, "h": 8 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "id": 4,
+      "type": "stat",
+      "title": "PDFs rendered / hour",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
-          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=\"l2_hit_cdn\" [5m]))",
-          "legendFormat": "L2 cache hit (cdn)", "refId": "A"
-        },
-        {
-          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=\"l2_hit_embedded\" [5m]))",
-          "legendFormat": "L2 cache hit (embedded)", "refId": "B"
-        },
-        {
-          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=\"inline\" [5m]))",
-          "legendFormat": "Inline render", "refId": "C"
+          "expr": "sum(rate(freedium_pdf_render_total{outcome=\"success\"}[5m]))*3600",
+          "refId": "A"
         }
       ]
     },
     {
-      "id": 14, "type": "table", "title": "Top Client UAs (1h)",
-      "gridPos": { "x": 0, "y": 38, "w": 12, "h": 8 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "topk(10, sum by (client_ua) (count_over_time({source=\"rendered_links\"} | json | client_ua != \"\" [1h])))",
-        "refId": "A"
-      }],
-      "transformations": [
-        { "id": "renameByRegex", "options": { "regex": "Value #A", "rename": "Count" } }
+      "id": 5,
+      "type": "timeseries",
+      "title": "HTTP latency (p50/p95/p99)",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate({__name__=~\"http_request_duration_seconds_bucket|freedium_web_http_request_duration_seconds_bucket\"}[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate({__name__=~\"http_request_duration_seconds_bucket|freedium_web_http_request_duration_seconds_bucket\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate({__name__=~\"http_request_duration_seconds_bucket|freedium_web_http_request_duration_seconds_bucket\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
       ]
     },
     {
-      "id": 15, "type": "logs", "title": "Recent successful renders",
-      "gridPos": { "x": 12, "y": 38, "w": 12, "h": 10 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "{source=\"rendered_links\"} | json | client_ua=~\"$client_ua\"",
-        "refId": "A"
-      }],
-      "options": { "showTime": true, "wrapLogMessage": false, "dedupStrategy": "none" }
+      "id": 6,
+      "type": "timeseries",
+      "title": "Article render latency",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(freedium_article_render_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(freedium_article_render_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        }
+      ]
     },
     {
-      "id": 16, "type": "logs", "title": "Render trace — by article URL ($url)",
-      "gridPos": { "x": 0, "y": 46, "w": 12, "h": 10 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "id": 7,
+      "type": "timeseries",
+      "title": "Errored links by kind",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (kind) (rate(freedium_errored_links_total{kind=~\"$kind\",host=~\"$host\"}[1m]))",
+          "legendFormat": "{{kind}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "barchart",
+      "title": "Top errored hosts (1h)",
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (host) (increase(freedium_errored_links_total[1h])))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "logs",
+      "title": "Recent errored URLs",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "{job=\"freedium\",source=\"errored_links\",kind=~\"$kind\",host=~\"$host\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 10,
+      "type": "logs",
+      "title": "Errored URL search ($url)",
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "{job=\"freedium\",source=\"errored_links\"} |= \"$url\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Cache hit ratio (5m)",
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=~\"l2_hit.*\" [$__range])) / sum(count_over_time({source=\"rendered_links\"} | json [$__range]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Successful renders / min",
+      "gridPos": {
+        "x": 6,
+        "y": 30,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | client_ua=~\"$client_ua\" [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Successful render rate",
+      "gridPos": {
+        "x": 12,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=\"l2_hit_cdn\" [5m]))",
+          "legendFormat": "L2 cache hit (cdn)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=\"l2_hit_embedded\" [5m]))",
+          "legendFormat": "L2 cache hit (embedded)",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(count_over_time({source=\"rendered_links\"} | json | cache=\"inline\" [5m]))",
+          "legendFormat": "Inline render",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "Top Client UAs (1h)",
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (client_ua) (count_over_time({source=\"rendered_links\"} | json | client_ua != \"\" [1h])))",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "Value #A",
+            "rename": "Count"
+          }
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "logs",
+      "title": "Recent successful renders",
+      "gridPos": {
+        "x": 12,
+        "y": 38,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "{source=\"rendered_links\"} | json | client_ua=~\"$client_ua\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": false,
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 16,
+      "type": "logs",
+      "title": "Render trace \u2014 by article URL ($url)",
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
       "targets": [
         {
           "expr": "{source=\"rendered_links\"} | json | url=~\"(?i).*$url.*\"",
@@ -213,19 +490,204 @@
           "refId": "E"
         }
       ],
-      "options": { "showTime": true, "wrapLogMessage": true, "dedupStrategy": "none" }
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "dedupStrategy": "none"
+      }
     },
     {
-      "id": 17, "type": "logs", "title": "UA search across all render logs",
-      "gridPos": { "x": 12, "y": 46, "w": 12, "h": 10 },
-      "datasource": { "type": "loki", "uid": "loki" },
+      "id": 17,
+      "type": "logs",
+      "title": "UA search across all render logs",
+      "gridPos": {
+        "x": 12,
+        "y": 46,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
       "targets": [
         {
           "expr": "{source=\"rendered_links\"} | json | client_ua=~\"(?i).*$client_ua.*\"",
           "refId": "A"
         }
       ],
-      "options": { "showTime": true, "wrapLogMessage": false, "dedupStrategy": "none" }
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": false,
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "L1 hit ratio (post_cache, GraphQL)",
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(freedium_cache_hits_total[$__range])) / clamp_min(sum(rate(freedium_cache_hits_total[$__range])) + sum(rate(freedium_cache_misses_total[$__range])), 0.0001)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "L2 hit ratio (rendered_cache, markdown)",
+      "gridPos": {
+        "x": 6,
+        "y": 56,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(freedium_rendered_cache_hits_total[$__range])) / clamp_min(sum(rate(freedium_rendered_cache_hits_total[$__range])) + sum(rate(freedium_rendered_cache_misses_total[$__range])), 0.0001)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Cache lookups by level (hits / misses per min)",
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(freedium_cache_hits_total[5m]))*60",
+          "legendFormat": "L1 hit (post_cache)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(freedium_cache_misses_total[5m]))*60",
+          "legendFormat": "L1 miss \u2192 Medium",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(freedium_rendered_cache_hits_total[5m]))*60",
+          "legendFormat": "L2 hit (rendered_cache)",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(freedium_rendered_cache_misses_total[5m]))*60",
+          "legendFormat": "L2 miss \u2192 render",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "piechart",
+      "title": "Render outcome by cache tier (1h)",
+      "gridPos": {
+        "x": 0,
+        "y": 60,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "sum by (cache) (count_over_time({source=\"rendered_links\"} | json | cache != \"\" [1h]))",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut"
+      }
     }
   ]
 }

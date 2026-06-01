@@ -20,7 +20,12 @@ const httpDuration = new Histogram({
 	name: "freedium_web_http_request_duration_seconds",
 	help: "HTTP request duration in seconds.",
 	labelNames: ["method", "route"] as const,
-	buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+	// Buckets extend to 120s: cold article renders (cache miss → Medium
+	// fetch + render through WARP) legitimately take 10-90s and the SSR
+	// request streams until that resolves. Without the >10s buckets, p99
+	// pins at exactly 10 (the old top bucket) whenever a cold render lands
+	// in a window — a flat square wave instead of the real latency.
+	buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120],
 	registers: [registry],
 });
 

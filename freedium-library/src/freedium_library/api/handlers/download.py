@@ -124,6 +124,18 @@ def _build_frontmatter(
     return "\n".join(lines)
 
 
+def _build_heading(metadata: PostMetadata) -> str:
+    """Title as an H1 + subtitle (italic) at the top of the document body, so
+    the rendered .md shows them — not only in the frontmatter."""
+    lines: list[str] = []
+    if metadata.title:
+        lines.append(f"# {metadata.title}")
+    if metadata.subtitle:
+        lines.append("")
+        lines.append(f"*{metadata.subtitle}*")
+    return "\n".join(lines) + "\n\n" if lines else ""
+
+
 @beartype
 @inject
 async def _build_download(
@@ -142,6 +154,7 @@ async def _build_download(
     body = (
         _build_frontmatter(metadata, freedium_url=freedium_link, source_url=source_url)
         + "\n"
+        + _build_heading(metadata)
         + resolved
     )
     filename = f"{_slugify(metadata.title)}.md"

@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass
 
 import httpx
+import yaml
 from beartype import beartype
 
 from freedium_library.services.medium.gist_resolver import (
@@ -101,34 +101,38 @@ def _slugify(title: str | None, fallback: str = "article") -> str:
     return slug or fallback
 
 
-def _yaml_quote(value: str) -> str:
-    """Double-quoted YAML scalar safe for arbitrary text."""
-    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-
 @beartype
 def _build_frontmatter(
     metadata: PostMetadata, freedium_url: str = "", source_url: str = ""
 ) -> str:
-    """YAML frontmatter with title, subtitle, tags, and source links. Skips
-    empty fields so consumers don't see `subtitle: ""` for articles that
-    don't have one."""
-    lines: list[str] = ["---"]
+    """YAML frontmatter with title, subtitle, tags, and source links.
+
+    Serialized with PyYAML (safe_dump) so arbitrary text — quotes, colons,
+    newlines, unicode — is escaped correctly. Empty fields are skipped so
+    consumers don't see `subtitle: ""` for articles that don't have one.
+    """
+    data: dict[str, object] = {}
     if metadata.title:
-        lines.append(f"title: {_yaml_quote(metadata.title)}")
+        data["title"] = metadata.title
     if metadata.subtitle:
-        lines.append(f"subtitle: {_yaml_quote(metadata.subtitle)}")
-    tags: Iterable[str] = (t for t in metadata.tags if t)
-    rendered_tags = [_yaml_quote(t) for t in tags]
-    if rendered_tags:
-        lines.append(f"tags: [{', '.join(rendered_tags)}]")
+        data["subtitle"] = metadata.subtitle
+    tags = [t for t in metadata.tags if t]
+    if tags:
+        data["tags"] = tags
     if freedium_url:
-        lines.append(f"freedium_url: {_yaml_quote(freedium_url)}")
+        data["freedium_url"] = freedium_url
     if source_url:
-        lines.append(f"source_url: {_yaml_quote(source_url)}")
-    lines.append("---")
-    lines.append("")
-    return "\n".join(lines)
+        data["source_url"] = source_url
+    if not data:
+        return "---\n---\n"
+    dumped = yaml.safe_dump(
+        data,
+        sort_keys=False,  # preserve title → subtitle → tags → links order
+        allow_unicode=True,  # keep ’ é … literal instead of \uXXXX escapes
+        default_flow_style=False,
+        width=1_000_000,  # never line-wrap long scalars (URLs, subtitles)
+    )
+    return f"---\n{dumped}---\n"
 
 
 def _build_heading(metadata: PostMetadata) -> str:

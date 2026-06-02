@@ -15,6 +15,15 @@ set -euo pipefail
 cd "$(dirname "$0")"
 SVC="${1:-web}"
 
+# Serialize deploys. Two overlapping runs (e.g. backgrounded back-to-back)
+# race on `docker compose up`/--scale and collide on container names, leaving
+# the stack half-recreated. flock makes a second run abort cleanly.
+exec 9>/tmp/freedium-deploy.lock
+if ! flock -n 9; then
+  echo "ERROR: another deploy is already running (holding /tmp/freedium-deploy.lock); aborting." >&2
+  exit 1
+fi
+
 echo "==> building $SVC"
 docker compose build "$SVC"
 

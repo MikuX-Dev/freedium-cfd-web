@@ -174,3 +174,6 @@ ban_post_list.db
 postgres/
 
 .playwright-mcp/
+
+# host-only monitor secrets (Telegram token/chat id)
+monitor.env

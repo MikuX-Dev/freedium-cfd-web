@@ -125,7 +125,8 @@
       "targets": [
         {
           "expr": "sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\",status=~\"5..\"}[5m])) / sum(rate({__name__=~\"http_requests_total|freedium_web_http_requests_total\"}[5m]))",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -144,6 +145,15 @@
               }
             ]
           }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
       }
     },
@@ -539,7 +549,8 @@
       "targets": [
         {
           "expr": "sum(rate(freedium_cache_hits_total[$__range])) / clamp_min(sum(rate(freedium_cache_hits_total[$__range])) + sum(rate(freedium_cache_misses_total[$__range])), 0.0001)",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -564,6 +575,15 @@
               }
             ]
           }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
       }
     },
@@ -584,7 +604,8 @@
       "targets": [
         {
           "expr": "sum(rate(freedium_rendered_cache_hits_total[$__range])) / clamp_min(sum(rate(freedium_rendered_cache_hits_total[$__range])) + sum(rate(freedium_rendered_cache_misses_total[$__range])), 0.0001)",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -609,6 +630,15 @@
               }
             ]
           }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
       }
     },

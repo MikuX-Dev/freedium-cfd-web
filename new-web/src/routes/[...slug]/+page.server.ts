@@ -55,6 +55,22 @@ export const load: PageServerLoad = async ({ params, request }) => {
 				},
 			};
 		}
+		if (message === "UPSTREAM_422") {
+			recordArticleFetch("not_found");
+			return {
+				html: null as string | null,
+				markdown: null as string | null,
+				article: null as import("$lib/types").ArticlePageData["article"] | null,
+				cacheStatus: "miss" as string,
+				renderTimeMs: Math.round(performance.now() - start),
+				error: {
+					status: 400,
+					message:
+						"This site isn’t supported. Freedium unlocks article paywalls — video, social, search, and shopping links aren’t articles.",
+					code: "UNSUPPORTED_SITE",
+				},
+			};
+		}
 		console.error("Failed to render article:", err);
 		recordArticleFetch(
 			message.startsWith("UPSTREAM_") ? "upstream_error" : "network_fail",

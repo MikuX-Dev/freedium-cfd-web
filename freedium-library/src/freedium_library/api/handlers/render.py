@@ -8,6 +8,7 @@ from fastapi.responses import PlainTextResponse
 from loguru import logger
 from pydantic import BaseModel
 
+from freedium_library.api.blocked_domains import is_blocked_domain
 from freedium_library.api.error_log import log_errored_link, log_successful_render
 from freedium_library.api.metrics import (
     ARTICLE_RENDER,
@@ -129,6 +130,11 @@ async def render_universal(
         HTTPException 404: If no service can handle the content
         HTTPException 500: If rendering fails
     """
+    # Reject sites that are definitely not paywalled articles (YouTube,
+    # social, search, shopping) before burning any fetch/render work.
+    if is_blocked_domain(request.content):
+        raise HTTPException(status_code=422, detail="unsupported_site")
+
     # The real browser/bot UA, forwarded by SvelteKit SSR as X-Client-UA.
     # Falls back to the direct User-Agent header (covers internal/testing
     # calls that bypass the web tier).

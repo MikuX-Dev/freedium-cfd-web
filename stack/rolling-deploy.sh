@@ -47,4 +47,13 @@ else
   docker compose up -d --no-deps --force-recreate "$SVC"
 fi
 
+# Reclaim space from the now-superseded image + this build's cache. Every
+# deploy builds a fresh image; without this the dangling layers pile up and
+# eventually fill the disk (which silently breaks Mongo/backend writes →
+# articles stop rendering). image prune -f only removes untagged/dangling
+# images, never anything a container references.
+echo "==> pruning dangling images + build cache"
+docker image prune -f >/dev/null 2>&1 || true
+docker builder prune -f >/dev/null 2>&1 || true
+
 echo "==> done"

@@ -22,6 +22,14 @@
   let lastScrollY = $state(0);
 
   function handleScroll() {
+    // While the mobile menu is open it lives inside this nav — keep the
+    // header pinned so scrolling (e.g. to reach menu items) can't slide the
+    // whole thing (and the open menu) off-screen.
+    if (isNavOpen) {
+      isHeaderVisible = true;
+      lastScrollY = window.scrollY;
+      return;
+    }
     const currentScrollY = window.scrollY;
     const documentHeight = document.documentElement.scrollHeight - window.innerHeight;
     const scrollPercentage = (currentScrollY / documentHeight) * 100;
@@ -38,7 +46,10 @@
     return () => window.removeEventListener('scroll', handleScroll);
   });
 
-  const toggleNav = () => { isNavOpen = !isNavOpen; };
+  const toggleNav = () => {
+    isNavOpen = !isNavOpen;
+    if (isNavOpen) isHeaderVisible = true; // reveal the header when opening the menu
+  };
   const toggleSearch = () => { isSearchOpen = !isSearchOpen; };
 </script>
 

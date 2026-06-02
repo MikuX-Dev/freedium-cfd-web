@@ -13,7 +13,6 @@ Mongo is unavailable. Matching is suffix-based, so a bare entry like
 """
 from __future__ import annotations
 
-import os
 import re
 import time
 from urllib.parse import urlparse
@@ -61,7 +60,6 @@ _COLLAPSED_SCHEME = re.compile(r"^(https?):/(?!/)", re.IGNORECASE)
 _COLLECTION = "blocked_domains"
 _TTL_SECONDS = 300
 _cache: dict[str, object] = {"value": None, "at": 0.0}
-_client = None
 
 
 def _host(url: str) -> str:
@@ -85,12 +83,9 @@ def _matches(content: str, domains: frozenset[str]) -> bool:
 
 
 def _collection():
-    global _client
-    from motor.motor_asyncio import AsyncIOMotorClient
+    from freedium_library.utils.mongo import get_collection
 
-    if _client is None:
-        _client = AsyncIOMotorClient(os.environ.get("MONGO_URL", "mongodb://localhost:27017"))
-    return _client[os.environ.get("MONGO_DB", "freedium_cache")][_COLLECTION]
+    return get_collection(_COLLECTION)
 
 
 async def seed_blocked_domains() -> None:

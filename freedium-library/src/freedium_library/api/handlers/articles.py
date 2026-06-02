@@ -12,23 +12,6 @@ from freedium_library.services.recent_posts.container import RecentPostsContaine
 # refresh_article_count scheduled task (tasks/article_count.py), so this
 # endpoint is just a Redis GET shared across all workers.
 _ARTICLE_COUNT_KEY = "freedium:article_count"
-_count_client = None
-
-
-def _post_cache_collection():
-    """Lazy motor handle to the L1 post_cache collection (distinct Medium
-    articles ever fetched ≈ articles unlocked, all-time)."""
-    global _count_client
-    import os
-
-    from motor.motor_asyncio import AsyncIOMotorClient
-
-    if _count_client is None:
-        _count_client = AsyncIOMotorClient(
-            os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-        )
-    db = _count_client[os.environ.get("MONGO_DB", "freedium_cache")]
-    return db["post_cache"]
 
 
 async def _unlocked_count() -> int:
@@ -39,6 +22,8 @@ async def _unlocked_count() -> int:
 
     from redis.asyncio import Redis
 
+    from freedium_library.utils.mongo import get_collection
+
     r = Redis.from_url(
         os.environ.get("REDIS_URL", "redis://localhost:6379/0"), decode_responses=True
     )
@@ -46,7 +31,7 @@ async def _unlocked_count() -> int:
         cached = await r.get(_ARTICLE_COUNT_KEY)
         if cached is not None:
             return int(cached)
-        n = int(await _post_cache_collection().estimated_document_count())
+        n = int(await get_collection("post_cache").estimated_document_count())
         await r.setex(_ARTICLE_COUNT_KEY, 900, n)  # 900s backstop vs a stuck scheduler
         return n
     except Exception:  # noqa: BLE001

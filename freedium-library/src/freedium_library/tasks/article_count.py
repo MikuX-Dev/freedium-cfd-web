@@ -9,21 +9,16 @@ from __future__ import annotations
 import os
 
 from loguru import logger
-from motor.motor_asyncio import AsyncIOMotorClient
 from redis.asyncio import Redis
 
 from freedium_library.tasks import broker
+from freedium_library.utils.mongo import get_collection
 
 _REDIS_KEY = "freedium:article_count"
 
 
 async def _compute_count() -> int:
-    client = AsyncIOMotorClient(os.environ.get("MONGO_URL", "mongodb://localhost:27017"))
-    try:
-        db = client[os.environ.get("MONGO_DB", "freedium_cache")]
-        return int(await db["post_cache"].estimated_document_count())
-    finally:
-        client.close()
+    return int(await get_collection("post_cache").estimated_document_count())
 
 
 @broker.task(schedule=[{"cron": "*/5 * * * *"}])

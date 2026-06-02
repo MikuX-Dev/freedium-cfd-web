@@ -132,7 +132,7 @@ async def render_universal(
     """
     # Reject sites that are definitely not paywalled articles (YouTube,
     # social, search, shopping) before burning any fetch/render work.
-    if is_blocked_domain(request.content):
+    if await is_blocked_domain(request.content):
         raise HTTPException(status_code=422, detail="unsupported_site")
 
     # The real browser/bot UA, forwarded by SvelteKit SSR as X-Client-UA.

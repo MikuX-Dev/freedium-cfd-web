@@ -56,7 +56,7 @@ export const load: PageServerLoad = async ({ params, request }) => {
 			};
 		}
 		if (message === "UPSTREAM_422") {
-			recordArticleFetch("not_found");
+			recordArticleFetch("unsupported");
 			return {
 				html: null as string | null,
 				markdown: null as string | null,

@@ -55,7 +55,8 @@ export type ArticleFetchOutcome =
 	| "success"
 	| "upstream_error"
 	| "network_fail"
-	| "not_found";
+	| "not_found"
+	| "unsupported";
 
 export function recordHttp(opts: {
 	method: string;

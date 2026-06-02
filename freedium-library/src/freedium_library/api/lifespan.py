@@ -58,6 +58,12 @@ async def _warmup_recent_feed(
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     register_error_log_sink()
 
+    # Migrate the non-article domain denylist into Mongo when empty (ops own
+    # it thereafter). Best-effort: never crash startup over it.
+    from freedium_library.api.blocked_domains import seed_blocked_domains
+
+    await seed_blocked_domains()
+
     # TaskIQ result backend — used by /render/poll/{task_id} to check
     # render results produced by the worker process. Startup ensures
     # the Redis connection pool is warm.

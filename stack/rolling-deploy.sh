@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Zero-downtime rolling deploy.
+#
+# The web tier runs N replicas behind Traefik (which the edge HAProxy points
+# at). Recreating them all at once leaves a window with no healthy backend →
+# 502s, and the edge marks the origin down. This replaces them ONE AT A TIME,
+# waiting for each new replica to become healthy before touching the next, so
+# Traefik always has live backends and the edge never flaps.
+#
+# Usage (run from the stack/ dir, or anywhere — it cd's to its own dir):
+#   ./rolling-deploy.sh            # rolling-deploy the web tier (default)
+#   ./rolling-deploy.sh web
+#   ./rolling-deploy.sh backend    # single-container services: plain recreate
+set -euo pipefail
+cd "$(dirname "$0")"
+SVC="${1:-web}"
+
+echo "==> building $SVC"
+docker compose build "$SVC"
+
+wait_healthy() {  # $1 = name filter, $2 = expected healthy count
+  until [ "$(docker ps --filter "name=$1" --filter health=healthy -q | wc -l)" -ge "$2" ]; do
+    sleep 2
+  done
+}
+
+if [ "$SVC" = "web" ]; then
+  total=$(docker ps --filter "name=freedium-obs-web" -q | wc -l)
+  [ "$total" -ge 1 ] || total=3
+  echo "==> rolling $total web replicas (one at a time)"
+  for c in $(docker ps --filter "name=freedium-obs-web" -q); do
+    name=$(docker inspect -f '{{.Name}}' "$c" | sed 's#^/##')
+    echo "  -> replacing $name"
+    docker stop "$c" >/dev/null   # graceful SIGTERM; Traefik drops it from rotation
+    docker rm "$c" >/dev/null
+    # Recreate ONLY the now-missing replica, with the freshly-built image.
+    # --no-recreate leaves the still-serving replicas untouched (they keep the
+    # old image until it's their turn), so >=1 replica is always healthy.
+    docker compose up -d --no-deps --no-recreate --scale web="$total" web >/dev/null
+    wait_healthy freedium-obs-web "$total"
+    echo "     OK ($total/$total healthy)"
+  done
+else
+  # Single-container services have no spare replica to roll through, so this
+  # is a normal recreate (brief blip). Run 2+ replicas to make it zero-downtime.
+  echo "==> recreating $SVC"
+  docker compose up -d --no-deps --force-recreate "$SVC"
+fi
+
+echo "==> done"

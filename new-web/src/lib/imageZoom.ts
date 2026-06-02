@@ -3,9 +3,11 @@
  *
  * Replaces medium-zoom. Opens INSTANTLY with the resolution the browser
  * already decoded (`currentSrc`, 700/2000px in cache), then quietly upgrades
- * to the 2000px variant in the background — never the 4000px, never blocking,
- * so it can't hang. Arrows (and ← → keys) cycle through every zoomable image
- * in the article; scroll / Esc / click closes.
+ * to the best available resolution (the 4000px data-zoom-src, served + cached
+ * via our /img proxy) in the background. The upgrade is non-blocking — the
+ * instant image shows first and the hi-res swaps in when ready — so a large
+ * source can't hang the open. Arrows (and ← → keys) cycle through every
+ * zoomable image; scroll / Esc / click closes.
  */
 
 let overlay: HTMLDivElement | null = null;
@@ -117,15 +119,20 @@ function highResVariant(src: string): string | null {
 	return m ? `/img/2000/${m[1]}` : null;
 }
 
-/** Load an image's content into the overlay: instant currentSrc, async 2000px
- * upgrade, caption. No layout animation (used for open + navigation). */
+/** Load an image's content into the overlay: instant currentSrc, async
+ * upgrade to the best resolution, caption. No layout animation (used for
+ * open + navigation). */
 function renderImage(img: HTMLImageElement): void {
 	if (!overlayImg || !overlayCaption) return;
 	const loaded = img.currentSrc || img.src;
 	overlayImg.src = loaded;
 	overlayImg.alt = img.alt || "";
 
-	const hi = highResVariant(img.dataset.zoomSrc || img.src || "");
+	// Upgrade to the best available resolution: the data-zoom-src (4000px,
+	// served + cached via our /img proxy) directly, else a 2000px variant
+	// derived from the displayed src. Non-blocking — `loaded` (already
+	// decoded) shows instantly and this swaps in when ready, so it can't hang.
+	const hi = img.dataset.zoomSrc || highResVariant(img.src || "");
 	if (hi && hi !== loaded) {
 		const pre = new Image();
 		pre.onload = () => {

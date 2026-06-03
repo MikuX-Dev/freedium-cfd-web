@@ -20,7 +20,7 @@ Usage (run inside the backend container — hits localhost:7080/api):
     python warm_render.py --in /var/log/freedium/medium-urls.txt \
         --done /var/log/freedium/warm-done.txt \
         --base http://localhost:7080/api --concurrency 4 \
-        --filter '/[0-9a-f]{12}(\?|$)'
+        --filter '/[0-9a-f]{12}$'
 """
 from __future__ import annotations
 

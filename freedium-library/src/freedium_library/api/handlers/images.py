@@ -62,13 +62,30 @@ def _get_backend() -> ImageCacheBackend:
 
 
 def _jxl_to_jpeg(jxl: bytes) -> bytes:
-    """Decode JXL → JPEG via the djxl CLI. Runs in a thread-pool executor
-    so it never blocks the uvicorn event loop (12-80ms per call)."""
-    r = subprocess.run(
-        ["djxl", "--pixels_to_jpeg", "-", "-"],
-        input=jxl, capture_output=True, check=True, timeout=15,
-    )
-    return r.stdout
+    """Decode JXL → JPEG via djxl (temp files). Runs in thread-pool executor.
+    djxl's --pixels_to_jpeg needs a named output file (can't auto-detect
+    format from stdin/stdout). ~12-80ms per call."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".jxl", delete=False) as f_in:
+        f_in.write(jxl)
+        in_path = f_in.name
+    out_path = in_path + ".jpg"
+    try:
+        subprocess.run(
+            ["djxl", "--pixels_to_jpeg", in_path, out_path],
+            capture_output=True, check=True, timeout=15,
+        )
+        with open(out_path, "rb") as f:
+            return f.read()
+    finally:
+        try:
+            os.unlink(in_path)
+        except OSError:
+            pass
+        try:
+            os.unlink(out_path)
+        except OSError:
+            pass
 
 
 def _proxy() -> str | None:

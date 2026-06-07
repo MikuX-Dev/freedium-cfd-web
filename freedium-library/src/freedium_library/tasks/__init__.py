@@ -39,11 +39,3 @@ from freedium_library.tasks import random_posts as _random_posts  # noqa: E402, 
 from freedium_library.tasks import article_count as _article_count  # noqa: E402, F401
 from freedium_library.tasks import image_converter as _image_converter  # noqa: E402, F401
 
-# Start a lightweight /metrics HTTP server so Prometheus can scrape
-# worker-side counters (JXL_CONVERSION, etc.) that the backend can't
-# see. Controlled by START_METRICS_SERVER env (worker only, not scheduler
-# or backend — port collision otherwise).
-if os.environ.get("START_METRICS_SERVER", "").lower() in ("1", "true"):
-    from freedium_library.tasks.metrics_server import start_metrics_server
-
-    start_metrics_server()

@@ -863,13 +863,13 @@
     },
     {
       "id": 26,
-      "type": "stat",
-      "title": "PNG \u2192 JXL progress",
+      "type": "timeseries",
+      "title": "Image serve format (stacked, per min)",
       "gridPos": {
         "x": 0,
         "y": 84,
-        "w": 6,
-        "h": 4
+        "w": 24,
+        "h": 10
       },
       "datasource": {
         "type": "prometheus",
@@ -877,33 +877,49 @@
       },
       "targets": [
         {
-          "expr": "freedium_jxl_conversion_total{outcome=\"success\"}",
-          "refId": "A",
-          "instant": true
+          "expr": "sum(rate(freedium_image_serve_total{format='png'}[1m]))*60",
+          "legendFormat": "PNG (raw)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(freedium_image_serve_total{format='jpeg'}[1m]))*60",
+          "legendFormat": "JPEG (raw)",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(freedium_image_serve_total{format='gif'}[1m]))*60",
+          "legendFormat": "GIF (raw)",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(freedium_image_serve_total{format='jxl_native'}[1m]))*60",
+          "legendFormat": "JXL native",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(rate(freedium_image_serve_total{format='jxl_fallback'}[1m]))*60",
+          "legendFormat": "JXL\u2192JPEG fallback",
+          "refId": "E"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+          "unit": "short",
+          "custom": {
+            "stacking": {
+              "mode": "normal"
+            }
+          }
         }
       }
     },
     {
       "id": 27,
-      "type": "timeseries",
-      "title": "Image cache: PNG vs JXL (cumulative)",
+      "type": "piechart",
+      "title": "Image serve distribution (1h)",
       "gridPos": {
-        "x": 6,
-        "y": 84,
+        "x": 0,
+        "y": 94,
         "w": 12,
         "h": 8
       },
@@ -913,59 +929,30 @@
       },
       "targets": [
         {
-          "expr": "freedium_jxl_conversion_total{outcome=\"success\"}",
-          "legendFormat": "JXL converted",
-          "refId": "A"
+          "expr": "sum by (format) (increase(freedium_image_serve_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{format}}"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "fillOpacity": 10
-          }
+      "options": {
+        "pieType": "donut",
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
         }
       }
     },
     {
       "id": 28,
-      "type": "timeseries",
-      "title": "JXL conversion rate (per minute)",
-      "gridPos": {
-        "x": 18,
-        "y": 84,
-        "w": 6,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(freedium_jxl_conversion_total{outcome=\"success\"}[5m]))*60",
-          "legendFormat": "converted/min",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(rate(freedium_jxl_conversion_total{outcome=~\"cjxl_error|cjxl_timeout|size_anomaly\"}[5m]))*60",
-          "legendFormat": "errors/min",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
-      }
-    },
-    {
-      "id": 29,
       "type": "stat",
-      "title": "Conversion ETA (h)",
+      "title": "JXL adoption (1h)",
       "gridPos": {
         "x": 12,
-        "y": 84,
+        "y": 94,
         "w": 6,
         "h": 4
       },
@@ -975,13 +962,77 @@
       },
       "targets": [
         {
-          "expr": "((214584 - freedium_jxl_conversion_total{outcome=\"success\"}) / clamp_min(rate(freedium_jxl_conversion_total{outcome=\"success\"}[30m]) * 3600, 0.001))",
+          "expr": "(sum(increase(freedium_image_serve_total{format=~'jxl_.*'}[1h])) or vector(0)) / clamp_min(sum(increase(freedium_image_serve_total[1h])), 0.001)",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.2
+              },
+              {
+                "color": "green",
+                "value": 0.6
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 29,
+      "type": "stat",
+      "title": "JXL\u2192JPEG fallback rate",
+      "gridPos": {
+        "x": 18,
+        "y": 94,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "(sum(increase(freedium_image_serve_total{format='jxl_fallback'}[1h])) or vector(0)) / clamp_min(sum(increase(freedium_image_serve_total{format=~'jxl_.*'}[1h])), 0.001)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.15
+              },
+              {
+                "color": "red",
+                "value": 0.3
+              }
+            ]
+          }
         }
       }
     }

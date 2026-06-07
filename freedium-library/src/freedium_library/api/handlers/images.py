@@ -124,16 +124,18 @@ def register_images_router(app: FastAPI) -> None:
                     for mt in accept.split(",")
                 )
                 if supports_jxl:
-                    from freedium_library.api.metrics import JXL_SERVE
+                    from freedium_library.api.metrics import IMAGE_SERVE, JXL_SERVE
                     JXL_SERVE.labels(format="jxl").inc()
+                    IMAGE_SERVE.labels(format="jxl_native").inc()
                     return Response(content=data, media_type="image/jxl",
                                     headers=_RESP_HEADERS)
                 # Firefox fallback
                 try:
                     loop = asyncio.get_running_loop()
                     jpeg = await loop.run_in_executor(None, _jxl_to_jpeg, data)
-                    from freedium_library.api.metrics import JXL_SERVE
+                    from freedium_library.api.metrics import IMAGE_SERVE, JXL_SERVE
                     JXL_SERVE.labels(format="jpeg_fallback").inc()
+                    IMAGE_SERVE.labels(format="jxl_fallback").inc()
                     return Response(content=jpeg, media_type="image/jpeg",
                                     headers=_RESP_HEADERS)
                 except Exception:
@@ -145,7 +147,10 @@ def register_images_router(app: FastAPI) -> None:
                                     headers=_RESP_HEADERS)
 
             # Stored types are already allowlisted, but normalize defensively.
+            from freedium_library.api.metrics import IMAGE_SERVE
             safe = _safe_type(content_type) or "image/jpeg"
+            fmt = (safe or "image/jpeg").split("/")[-1]  # "png", "jpeg", "gif", "webp"
+            IMAGE_SERVE.labels(format=fmt).inc()
             return Response(content=data, media_type=safe, headers=_RESP_HEADERS)
 
         # Miss → fetch from Medium CDN. Host is hardcoded and redirects are

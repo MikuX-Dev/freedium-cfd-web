@@ -107,6 +107,12 @@ JXL_SERVE = Counter(
     labelnames=("format",),
 )  # formats: jxl | jpeg_fallback | fallback_error
 
+IMAGE_SERVE = Counter(
+    "freedium_image_serve_total",
+    "Total image cache hits by served format (stackable to compare raw vs JXL).",
+    labelnames=("format",),
+)  # formats: png | jpeg | gif | webp | jxl_native | jxl_fallback
+
 
 class _RenderContext:
     """Mutable handle yielded by track_render() so callers can set the

@@ -16,7 +16,7 @@
 	import { initializeCodeCopyButtons } from '$lib/codeCopy';
 	import { initializeLazyIframes } from '$lib/lazyIframe';
 	import { initializeImageZoom } from '$lib/imageZoom';
-	import { startIframeThemeSync } from '$lib/iframeTheme';
+	import { applyTheme } from '$lib/iframeTheme';
 	import { articleDownloadUrl } from '@/services';
 	import type { ArticlePageData } from '$lib/types';
 
@@ -108,12 +108,24 @@
 	// always SSRed with the light variant since the server can't read the
 	// client's theme preference). State/scroll inside the iframe resets
 	// on each swap — that's the known cost of approach D.
-	$effect(() => {
-		if (!contentLoaded) return;
-		const theme: 'light' | 'dark' = mode.current === 'dark' ? 'dark' : 'light';
-		const dispose = startIframeThemeSync(() => theme);
-		return dispose;
-	});
+		$effect(() => {
+			if (!contentLoaded) return;
+			const theme: "light" | "dark" = mode.current === "dark" ? "dark" : "light";
+			// Retry-loop: srcdoc iframes may not have documentElement ready
+			// when first queried (asynchronous srcdoc parsing). Retry every
+			// 100ms until all iframes are themed or 10 attempts exhausted.
+			let attempts = 0;
+			const MAX = 10;
+			function retry() {
+				if (++attempts > MAX) return;
+				let pending = false;
+				for (const iframe of document.querySelectorAll<HTMLIFrameElement>("iframe[data-iframe-id]")) {
+					if (!applyTheme(iframe, theme)) pending = true;
+				}
+				if (pending) setTimeout(retry, 100);
+			}
+			retry();
+		});
 </script>
 
 <svelte:head>

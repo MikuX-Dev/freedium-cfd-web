@@ -49,7 +49,7 @@ a, .gist a { color:#58a6ff !important; }
 // lands and the user sees a FOUC flash on first load.
 const THEMED_ATTR = "data-iframe-themed";
 
-function applyTheme(iframe: HTMLIFrameElement, theme: "light" | "dark"): boolean {
+export function applyTheme(iframe: HTMLIFrameElement, theme: "light" | "dark"): boolean {
 	let doc: Document | null;
 	try {
 		doc = iframe.contentDocument;

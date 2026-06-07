@@ -156,7 +156,6 @@ services:
       - ERROR_LOG_PATH=/var/log/freedium/errored-links.jsonl
       - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
       - START_METRICS_SERVER=true
-      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc_worker
     expose:
       - "8079"
     volumes:

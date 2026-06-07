@@ -88,6 +88,25 @@ RENDERED_CACHE_MISSES = Counter(
     "Requests that missed the rendered-output cache and required a full render.",
 )
 
+# PNG → JXL image conversion pipeline (background worker, every 2 min)
+JXL_CONVERSION = Counter(
+    "freedium_jxl_conversion_total",
+    "PNG → JXL conversions by the background worker, labelled by outcome.",
+    labelnames=("outcome",),
+)  # outcomes: success | cjxl_timeout | cjxl_error | size_anomaly
+
+JXL_CONVERSION_DURATION = Histogram(
+    "freedium_jxl_conversion_duration_seconds",
+    "cjxl subprocess wall time per image.",
+    buckets=(0.5, 1, 2, 5, 10, 30, 60),
+)
+
+JXL_SERVE = Counter(
+    "freedium_jxl_serve_total",
+    "Image serve format when a JXL-stored image is requested, labelled by format.",
+    labelnames=("format",),
+)  # formats: jxl | jpeg_fallback | fallback_error
+
 
 class _RenderContext:
     """Mutable handle yielded by track_render() so callers can set the

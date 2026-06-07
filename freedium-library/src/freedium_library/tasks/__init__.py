@@ -30,3 +30,4 @@ scheduler = TaskiqScheduler(
 from freedium_library.tasks import cache as _cache  # noqa: E402, F401
 from freedium_library.tasks import random_posts as _random_posts  # noqa: E402, F401
 from freedium_library.tasks import article_count as _article_count  # noqa: E402, F401
+from freedium_library.tasks import image_converter as _image_converter  # noqa: E402, F401

@@ -718,6 +718,148 @@
         },
         "pieType": "donut"
       }
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "JXL conversions / min",
+      "gridPos": {
+        "x": 0,
+        "y": 68,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='success'}[1m]))*60",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "JXL conversion rate",
+      "gridPos": {
+        "x": 6,
+        "y": 68,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='success'}[5m]))",
+          "legendFormat": "success",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='cjxl_error'}[5m]))",
+          "legendFormat": "cjxl_error",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='cjxl_timeout'}[5m]))",
+          "legendFormat": "cjxl_timeout",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='size_anomaly'}[5m]))",
+          "legendFormat": "size_anomaly",
+          "refId": "D"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "JXL serve format split",
+      "gridPos": {
+        "x": 18,
+        "y": 68,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(freedium_jxl_serve_total{format='jxl'}[5m]))",
+          "legendFormat": "jxl native",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(freedium_jxl_serve_total{format='jpeg_fallback'}[5m]))",
+          "legendFormat": "jpeg fallback",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(freedium_jxl_serve_total{format='fallback_error'}[5m]))",
+          "legendFormat": "fallback error",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 25,
+      "type": "logs",
+      "title": "JXL conversion errors",
+      "gridPos": {
+        "x": 0,
+        "y": 76,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "{container=\"freedium-worker\"} |= \"jxl conversion\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true
+      }
     }
   ]
 }

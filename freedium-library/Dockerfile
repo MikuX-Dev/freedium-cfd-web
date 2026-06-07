@@ -80,6 +80,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+# libjxl static binaries (cjxl encoder + djxl decoder). Not in Debian apt.
+# Downloaded from GitHub releases — statically linked, ~15 MB for both.
+RUN mkdir -p /tmp/jxl && cd /tmp/jxl \
+    && ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/') \
+    && curl -fsSL "https://github.com/libjxl/libjxl/releases/download/v0.11.1/jxl-${ARCH}-linux-static.tar.xz" -o jxl.tar.xz \
+    && tar xf jxl.tar.xz \
+    && cp cjxl djxl /usr/local/bin/ \
+    && rm -rf /tmp/jxl
+
 # Non-root runtime user
 RUN useradd --system --no-create-home --shell /usr/sbin/nologin freedium \
     && mkdir -p /var/log/freedium \

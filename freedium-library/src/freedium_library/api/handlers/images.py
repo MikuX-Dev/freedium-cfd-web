@@ -7,8 +7,10 @@ is regex-validated. Browser never contacts Medium.
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import re
+import subprocess
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -59,6 +61,16 @@ def _get_backend() -> ImageCacheBackend:
     return _backend
 
 
+def _jxl_to_jpeg(jxl: bytes) -> bytes:
+    """Decode JXL → JPEG via the djxl CLI. Runs in a thread-pool executor
+    so it never blocks the uvicorn event loop (12-80ms per call)."""
+    r = subprocess.run(
+        ["djxl", "--pixels_to_jpeg", "-", "-"],
+        input=jxl, capture_output=True, check=True, timeout=15,
+    )
+    return r.stdout
+
+
 def _proxy() -> str | None:
     first = os.environ.get("PROXY_LIST", "").split(",")[0].strip()
     return first or None
@@ -83,6 +95,31 @@ def register_images_router(app: FastAPI) -> None:
 
         if cached is not None:
             data, content_type = cached
+            # JXL stored: serve natively to supporting browsers, fall back to
+            # on-the-fly JPEG for Firefox/legacy via djxl (12ms decode).
+            if content_type == "image/jxl":
+                accept = request.headers.get("accept", "")
+                if "image/jxl" in accept or "image/*" in accept:
+                    from freedium_library.api.metrics import JXL_SERVE
+                    JXL_SERVE.labels(format="jxl").inc()
+                    return Response(content=data, media_type="image/jxl",
+                                    headers=_RESP_HEADERS)
+                # Firefox fallback
+                try:
+                    loop = asyncio.get_running_loop()
+                    jpeg = await loop.run_in_executor(None, _jxl_to_jpeg, data)
+                    from freedium_library.api.metrics import JXL_SERVE
+                    JXL_SERVE.labels(format="jpeg_fallback").inc()
+                    return Response(content=jpeg, media_type="image/jpeg",
+                                    headers=_RESP_HEADERS)
+                except Exception:
+                    logger.error(f"jxl fallback decode failed for {key}")
+                    from freedium_library.api.metrics import JXL_SERVE
+                    JXL_SERVE.labels(format="fallback_error").inc()
+                    # Serve JXL bytes anyway — better than a broken-image 502
+                    return Response(content=data, media_type="image/jxl",
+                                    headers=_RESP_HEADERS)
+
             # Stored types are already allowlisted, but normalize defensively.
             safe = _safe_type(content_type) or "image/jpeg"
             return Response(content=data, media_type=safe, headers=_RESP_HEADERS)

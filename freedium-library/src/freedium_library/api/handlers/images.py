@@ -13,7 +13,7 @@ import re
 import subprocess
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from loguru import logger
 
@@ -78,7 +78,7 @@ def _proxy() -> str | None:
 
 def register_images_router(app: FastAPI) -> None:
     @app.get("/img/{width}/{image_id}", include_in_schema=False)
-    async def get_image(width: int, image_id: str) -> Response:
+    async def get_image(width: int, image_id: str, request: Request) -> Response:
         if width not in _ALLOWED_WIDTHS:
             raise HTTPException(status_code=400, detail="unsupported width")
         if not _ID_RE.match(image_id):

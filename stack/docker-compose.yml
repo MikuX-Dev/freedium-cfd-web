@@ -159,6 +159,8 @@ services:
       - ERROR_LOG_PATH=/var/log/freedium/errored-links.jsonl
       - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+      - JXL_BATCH_SIZE=200
+      - JXL_PARALLEL=8
     expose:
       - "8079"
     volumes:

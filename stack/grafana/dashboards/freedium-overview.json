@@ -4,7 +4,7 @@
   "schemaVersion": 39,
   "editable": true,
   "graphTooltip": 1,
-  "refresh": "30s",
+  "refresh": "2m",
   "time": {
     "from": "now-1h",
     "to": "now"
@@ -93,7 +93,7 @@
       "title": "Articles rendered / min",
       "gridPos": {
         "x": 6,
-        "y": 0,
+        "y": 4,
         "w": 6,
         "h": 4
       },
@@ -114,7 +114,7 @@
       "title": "Error rate (5m)",
       "gridPos": {
         "x": 12,
-        "y": 0,
+        "y": 8,
         "w": 6,
         "h": 4
       },
@@ -163,7 +163,7 @@
       "title": "PDFs rendered / hour",
       "gridPos": {
         "x": 18,
-        "y": 0,
+        "y": 12,
         "w": 6,
         "h": 4
       },
@@ -184,7 +184,7 @@
       "title": "HTTP latency (p50/p95/p99)",
       "gridPos": {
         "x": 0,
-        "y": 4,
+        "y": 16,
         "w": 12,
         "h": 8
       },
@@ -216,7 +216,7 @@
       "title": "Article render latency",
       "gridPos": {
         "x": 12,
-        "y": 4,
+        "y": 24,
         "w": 12,
         "h": 8
       },
@@ -243,7 +243,7 @@
       "title": "Errored links by kind",
       "gridPos": {
         "x": 0,
-        "y": 12,
+        "y": 32,
         "w": 12,
         "h": 8
       },
@@ -274,7 +274,7 @@
       "title": "Top errored hosts (1h)",
       "gridPos": {
         "x": 12,
-        "y": 12,
+        "y": 40,
         "w": 12,
         "h": 8
       },
@@ -290,37 +290,12 @@
       ]
     },
     {
-      "id": 9,
-      "type": "logs",
-      "title": "Recent errored URLs",
-      "gridPos": {
-        "x": 0,
-        "y": 20,
-        "w": 12,
-        "h": 10
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "targets": [
-        {
-          "expr": "{job=\"freedium\",source=\"errored_links\",kind=~\"$kind\",host=~\"$host\"}",
-          "refId": "A"
-        }
-      ],
-      "options": {
-        "showTime": true,
-        "wrapLogMessage": true
-      }
-    },
-    {
       "id": 10,
       "type": "logs",
       "title": "Errored URL search ($url)",
       "gridPos": {
         "x": 12,
-        "y": 20,
+        "y": 48,
         "w": 12,
         "h": 10
       },
@@ -345,7 +320,7 @@
       "title": "Cache hit ratio (5m)",
       "gridPos": {
         "x": 0,
-        "y": 30,
+        "y": 58,
         "w": 6,
         "h": 4
       },
@@ -373,7 +348,7 @@
       "title": "Successful renders / min",
       "gridPos": {
         "x": 6,
-        "y": 30,
+        "y": 62,
         "w": 6,
         "h": 4
       },
@@ -394,7 +369,7 @@
       "title": "Successful render rate",
       "gridPos": {
         "x": 12,
-        "y": 30,
+        "y": 66,
         "w": 12,
         "h": 8
       },
@@ -421,124 +396,12 @@
       ]
     },
     {
-      "id": 14,
-      "type": "table",
-      "title": "Top Client UAs (1h)",
-      "gridPos": {
-        "x": 0,
-        "y": 38,
-        "w": 12,
-        "h": 8
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "targets": [
-        {
-          "expr": "topk(10, sum by (client_ua) (count_over_time({source=\"rendered_links\"} | json | client_ua != \"\" [1h])))",
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "Value #A",
-            "rename": "Count"
-          }
-        }
-      ]
-    },
-    {
-      "id": 15,
-      "type": "logs",
-      "title": "Recent successful renders",
-      "gridPos": {
-        "x": 12,
-        "y": 38,
-        "w": 12,
-        "h": 10
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "targets": [
-        {
-          "expr": "{source=\"rendered_links\"} | json | client_ua=~\"$client_ua\"",
-          "refId": "A"
-        }
-      ],
-      "options": {
-        "showTime": true,
-        "wrapLogMessage": false,
-        "dedupStrategy": "none"
-      }
-    },
-    {
-      "id": 16,
-      "type": "logs",
-      "title": "Render trace \u2014 by article URL ($url)",
-      "gridPos": {
-        "x": 0,
-        "y": 46,
-        "w": 12,
-        "h": 10
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "targets": [
-        {
-          "expr": "{source=\"rendered_links\"} | json | url=~\"(?i).*$url.*\"",
-          "refId": "R"
-        },
-        {
-          "expr": "{job=\"freedium\",source=\"errored_links\"} |= \"$url\"",
-          "refId": "E"
-        }
-      ],
-      "options": {
-        "showTime": true,
-        "wrapLogMessage": true,
-        "dedupStrategy": "none"
-      }
-    },
-    {
-      "id": 17,
-      "type": "logs",
-      "title": "UA search across all render logs",
-      "gridPos": {
-        "x": 12,
-        "y": 46,
-        "w": 12,
-        "h": 10
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "targets": [
-        {
-          "expr": "{source=\"rendered_links\"} | json | client_ua=~\"(?i).*$client_ua.*\"",
-          "refId": "A"
-        }
-      ],
-      "options": {
-        "showTime": true,
-        "wrapLogMessage": false,
-        "dedupStrategy": "none"
-      }
-    },
-    {
       "id": 18,
       "type": "stat",
       "title": "L1 hit ratio (post_cache, GraphQL)",
       "gridPos": {
         "x": 0,
-        "y": 56,
+        "y": 74,
         "w": 6,
         "h": 4
       },
@@ -593,7 +456,7 @@
       "title": "L2 hit ratio (rendered_cache, markdown)",
       "gridPos": {
         "x": 6,
-        "y": 56,
+        "y": 78,
         "w": 6,
         "h": 4
       },
@@ -648,7 +511,7 @@
       "title": "Cache lookups by level (hits / misses per min)",
       "gridPos": {
         "x": 12,
-        "y": 56,
+        "y": 82,
         "w": 12,
         "h": 8
       },
@@ -693,7 +556,7 @@
       "title": "Render outcome by cache tier (1h)",
       "gridPos": {
         "x": 0,
-        "y": 60,
+        "y": 90,
         "w": 12,
         "h": 8
       },
@@ -720,88 +583,12 @@
       }
     },
     {
-      "id": 22,
-      "type": "stat",
-      "title": "JXL conversions / min",
-      "gridPos": {
-        "x": 0,
-        "y": 68,
-        "w": 6,
-        "h": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='success'}[1m]))*60",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "id": 23,
-      "type": "timeseries",
-      "title": "JXL conversion rate",
-      "gridPos": {
-        "x": 6,
-        "y": 68,
-        "w": 12,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='success'}[5m]))",
-          "legendFormat": "success",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='cjxl_error'}[5m]))",
-          "legendFormat": "cjxl_error",
-          "refId": "B"
-        },
-        {
-          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='cjxl_timeout'}[5m]))",
-          "legendFormat": "cjxl_timeout",
-          "refId": "C"
-        },
-        {
-          "expr": "sum(rate(freedium_jxl_conversion_total{outcome='size_anomaly'}[5m]))",
-          "legendFormat": "size_anomaly",
-          "refId": "D"
-        }
-      ]
-    },
-    {
       "id": 24,
       "type": "timeseries",
       "title": "JXL serve format split",
       "gridPos": {
         "x": 18,
-        "y": 68,
+        "y": 98,
         "w": 6,
         "h": 8
       },
@@ -837,37 +624,12 @@
       }
     },
     {
-      "id": 25,
-      "type": "logs",
-      "title": "JXL conversion errors",
-      "gridPos": {
-        "x": 0,
-        "y": 76,
-        "w": 12,
-        "h": 8
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "targets": [
-        {
-          "expr": "{container=\"freedium-worker\"} |= \"jxl conversion\"",
-          "refId": "A"
-        }
-      ],
-      "options": {
-        "showTime": true,
-        "wrapLogMessage": true
-      }
-    },
-    {
       "id": 26,
       "type": "timeseries",
       "title": "Image serve format (stacked, per min)",
       "gridPos": {
         "x": 0,
-        "y": 84,
+        "y": 106,
         "w": 24,
         "h": 10
       },
@@ -919,7 +681,7 @@
       "title": "Image serve distribution (1h)",
       "gridPos": {
         "x": 0,
-        "y": 94,
+        "y": 116,
         "w": 12,
         "h": 8
       },
@@ -943,96 +705,6 @@
             "value",
             "percent"
           ]
-        }
-      }
-    },
-    {
-      "id": 28,
-      "type": "stat",
-      "title": "JXL adoption (1h)",
-      "gridPos": {
-        "x": 12,
-        "y": 94,
-        "w": 6,
-        "h": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "(sum(increase(freedium_image_serve_total{format=~'jxl_.*'}[1h])) or vector(0)) / clamp_min(sum(increase(freedium_image_serve_total[1h])), 0.001)",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "min": 0,
-          "max": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 0.2
-              },
-              {
-                "color": "green",
-                "value": 0.6
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "id": 29,
-      "type": "stat",
-      "title": "JXL\u2192JPEG fallback rate",
-      "gridPos": {
-        "x": 18,
-        "y": 94,
-        "w": 6,
-        "h": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "expr": "(sum(increase(freedium_image_serve_total{format='jxl_fallback'}[1h])) or vector(0)) / clamp_min(sum(increase(freedium_image_serve_total{format=~'jxl_.*'}[1h])), 0.001)",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "min": 0,
-          "max": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 0.15
-              },
-              {
-                "color": "red",
-                "value": 0.3
-              }
-            ]
-          }
         }
       }
     }

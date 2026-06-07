@@ -78,15 +78,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libgdk-pixbuf-2.0-0 \
         shared-mime-info \
         curl \
+        unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # libjxl static binaries (cjxl encoder + djxl decoder). Not in Debian apt.
-# Downloaded from GitHub releases — statically linked, extracted via Python's
-# zipfile (already in the base image, no need for unzip package).
+# Downloaded from GitHub releases — the asset is a zip containing a tar.gz.
 RUN mkdir -p /tmp/jxl && cd /tmp/jxl \
     && curl -fsSL "https://github.com/libjxl/libjxl/releases/download/v0.11.2/jxl-linux-x86_64-static.zip" -o jxl.zip \
-    && python3 -c "import zipfile; z=zipfile.ZipFile('jxl.zip'); z.extractall(); z.close()" \
-    && cp cjxl djxl /usr/local/bin/ \
+    && unzip -q jxl.zip \
+    && tar xf release_file.tar.gz \
+    && cp tools/cjxl tools/djxl /usr/local/bin/ \
     && rm -rf /tmp/jxl
 
 # Non-root runtime user

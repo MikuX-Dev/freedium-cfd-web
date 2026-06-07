@@ -86,7 +86,15 @@ export function startIframeThemeSync(
 	function ensure(iframe: HTMLIFrameElement) {
 		// Try immediately — works if the iframe document is already parsed.
 		if (applyTheme(iframe, getTheme())) return;
-		// Otherwise wait for the iframe's load event before applying.
+		// srcdoc iframes fire 'load' synchronously in some browsers, before
+		// our listener can be registered. Check readyState as a sync fallback.
+		const doc = iframe.contentDocument;
+		if (doc?.readyState === "complete") {
+			applyTheme(iframe, getTheme());
+			iframe.setAttribute(THEMED_ATTR, "");
+			return;
+		}
+		// Still parsing — wait for the load event, then apply.
 		const onLoad = () => {
 			applyTheme(iframe, getTheme());
 			// Failsafe: even if applyTheme couldn't reach contentDocument

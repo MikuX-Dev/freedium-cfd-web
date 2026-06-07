@@ -99,7 +99,14 @@ def register_images_router(app: FastAPI) -> None:
             # on-the-fly JPEG for Firefox/legacy via djxl (12ms decode).
             if content_type == "image/jxl":
                 accept = request.headers.get("accept", "")
-                if "image/jxl" in accept or "image/*" in accept:
+                # Only serve JXL natively if the client explicitly advertises
+                # image/jxl support. No wildcard matching — clients that send
+                # image/* or */* but don't list image/jxl get the JPEG fallback.
+                supports_jxl = any(
+                    mt.strip() == "image/jxl"
+                    for mt in accept.split(",")
+                )
+                if supports_jxl:
                     from freedium_library.api.metrics import JXL_SERVE
                     JXL_SERVE.labels(format="jxl").inc()
                     return Response(content=data, media_type="image/jxl",

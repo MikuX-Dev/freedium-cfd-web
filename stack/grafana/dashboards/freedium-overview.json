@@ -860,6 +860,130 @@
         "showTime": true,
         "wrapLogMessage": true
       }
+    },
+    {
+      "id": 26,
+      "type": "stat",
+      "title": "PNG \u2192 JXL progress",
+      "gridPos": {
+        "x": 0,
+        "y": 84,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "freedium_jxl_conversion_total{outcome=\"success\"}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 27,
+      "type": "timeseries",
+      "title": "Image cache: PNG vs JXL (cumulative)",
+      "gridPos": {
+        "x": 6,
+        "y": 84,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "freedium_jxl_conversion_total{outcome=\"success\"}",
+          "legendFormat": "JXL converted",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "timeseries",
+      "title": "JXL conversion rate (per minute)",
+      "gridPos": {
+        "x": 18,
+        "y": 84,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(freedium_jxl_conversion_total{outcome=\"success\"}[5m]))*60",
+          "legendFormat": "converted/min",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(freedium_jxl_conversion_total{outcome=~\"cjxl_error|cjxl_timeout|size_anomaly\"}[5m]))*60",
+          "legendFormat": "errors/min",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 29,
+      "type": "stat",
+      "title": "Conversion ETA (h)",
+      "gridPos": {
+        "x": 12,
+        "y": 84,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "((214584 - freedium_jxl_conversion_total{outcome=\"success\"}) / clamp_min(rate(freedium_jxl_conversion_total{outcome=\"success\"}[30m]) * 3600, 0.001))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
     }
   ]
 }

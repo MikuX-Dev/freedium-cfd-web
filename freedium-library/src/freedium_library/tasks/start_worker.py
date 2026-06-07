@@ -1,21 +1,39 @@
 #!/usr/bin/env python3
-"""Worker entrypoint: start the Prometheus metrics sidecar, then exec the
-TaskIQ worker. The sidecar runs in a daemon thread so it exits cleanly when
-the TaskIQ process terminates."""
+"""Worker entrypoint: start the Prometheus metrics sidecar, then run the
+TaskIQ worker as a child process. The sidecar stays alive and serves
+/metrics. When the taskiq worker exits, the sidecar dies with it.
+
+This avoids os.execvp (which kills the metrics thread) and the
+subprocess-only approach (which couldn't forward signals properly).
+"""
+import os
+import signal
+import subprocess
+import sys
+import threading
 
 from freedium_library.tasks.metrics_server import start_metrics_server
 
-# Must start BEFORE any prometheus_client metrics are imported (they switch
-# to multiprocess mode on import if PROMETHEUS_MULTIPROC_DIR is set).
+# Must start BEFORE taskiq children import prometheus_client metrics
+# (the multiprocess dir switch happens at import time).
 start_metrics_server()
 
-# Let the sidecar bind before spawning TaskIQ child processes.
+# Let the sidecar bind before spawning children.
 import time
-time.sleep(0.1)
+time.sleep(0.3)
 
-import os
-import sys
+# Run the real TaskIQ worker as a subprocess. Use the same Python
+# to avoid PATH issues with the taskiq console script.
+proc = subprocess.Popen(
+    [sys.executable, "-m", "taskiq", "worker", "freedium_library.tasks:broker"],
+)
 
-# exec the TaskIQ worker — replaces this Python process so we don't
-# waste memory on a parent that does nothing.
-os.execvp("taskiq", ["taskiq", "worker", "freedium_library.tasks:broker"] + sys.argv[1:])
+# Forward signals so docker stop / SIGTERM reaches the child.
+def _forward(signum, frame):
+    proc.send_signal(signum)
+signal.signal(signal.SIGTERM, _forward)
+signal.signal(signal.SIGINT, _forward)
+
+rc = proc.wait()
+sys.exit(rc)
+

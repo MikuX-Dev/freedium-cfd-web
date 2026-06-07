@@ -81,38 +81,63 @@ export function startIframeThemeSync(
 	const root = document.querySelector(rootSelector);
 	if (!root) return () => {};
 
-	const listeners = new Map<HTMLIFrameElement, () => void>();
+	const loadListeners = new Map<HTMLIFrameElement, () => void>();
 
+	/** Apply or remove dark theme on a single iframe. If the iframe document
+	 * isn't ready yet, waits for the load event (or readyState). Safe to call
+	 * on already-themed iframes (idempotent). */
 	function ensure(iframe: HTMLIFrameElement) {
-		// Try immediately — works if the iframe document is already parsed.
-		if (applyTheme(iframe, getTheme())) return;
-		// srcdoc iframes fire 'load' synchronously in some browsers, before
-		// our listener can be registered. Check readyState as a sync fallback.
 		const doc = iframe.contentDocument;
-		if (doc?.readyState === "complete") {
+		// Try immediate — works when the iframe document is already parsed.
+		if (doc?.documentElement) {
 			applyTheme(iframe, getTheme());
+			return;
+		}
+		// Not ready. If already loaded (readyState complete) but documentElement
+		// is null, something went wrong — reveal anyway so it's not stuck hidden.
+		if (doc?.readyState === "complete") {
 			iframe.setAttribute(THEMED_ATTR, "");
 			return;
 		}
-		// Still parsing — wait for the load event, then apply.
+		// Still loading — register load listener.
 		const onLoad = () => {
 			applyTheme(iframe, getTheme());
-			// Failsafe: even if applyTheme couldn't reach contentDocument
-			// (e.g. cross-origin in some unforeseen case), reveal the iframe
-			// rather than leaving it hidden by the CSS gate forever.
-			iframe.setAttribute(THEMED_ATTR, "");
+			loadListeners.delete(iframe);
 		};
-		iframe.addEventListener("load", onLoad);
-		listeners.set(iframe, () => iframe.removeEventListener("load", onLoad));
+		iframe.addEventListener("load", onLoad, { once: true });
+		loadListeners.set(iframe, () => iframe.removeEventListener("load", onLoad));
 	}
 
-	const iframes = root.querySelectorAll<HTMLIFrameElement>(
-		"iframe[data-iframe-id]",
-	);
-	for (const iframe of iframes) ensure(iframe);
+	// Re-theme ALL existing iframes (called on initial run AND on theme toggle
+	// from the caller's $effect cleanup/rerun cycle, via observer).
+	function themeAll() {
+		for (const iframe of root!.querySelectorAll<HTMLIFrameElement>("iframe[data-iframe-id]")) {
+			ensure(iframe);
+		}
+	}
+	themeAll();
+
+	// MutationObserver catches iframes added AFTER the initial scan — e.g.
+	// when { @html content } renders them into the prose container AFTER the
+	// $effect fired (a common Svelte streaming/dynamic-content race).
+	const observer = new MutationObserver((mutations) => {
+		for (const m of mutations) {
+			for (const node of m.addedNodes) {
+				if (node instanceof HTMLIFrameElement && node.hasAttribute("data-iframe-id")) {
+					ensure(node);
+				} else if (node instanceof Element) {
+					for (const iframe of node.querySelectorAll<HTMLIFrameElement>("iframe[data-iframe-id]")) {
+						ensure(iframe);
+					}
+				}
+			}
+		}
+	});
+	observer.observe(root, { childList: true, subtree: true });
 
 	return () => {
-		for (const off of listeners.values()) off();
-		listeners.clear();
+		observer.disconnect();
+		for (const off of loadListeners.values()) off();
+		loadListeners.clear();
 	};
 }

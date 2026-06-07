@@ -82,11 +82,10 @@ async def convert_pngs_to_jxl() -> None:
 
     docs = []
     # Use aggregation with $binarySize so Mongo filters by size server-side.
-    # A plain find().limit(N) returns N random PNGs, but in natural order
-    # most are <50KB → wasted fetches. This guarantees exactly BATCH_SIZE
-    # qualifying PNGs every cycle.
+    # Exclude previously-seen anomalous PNGs (JXL > 2× input — already as
+    # small as they'll get) so they don't waste a batch slot every cycle.
     async for doc in col.aggregate([
-        {"$match": {"content_type": "image/png"}},
+        {"$match": {"content_type": "image/png", "jxl_anomalous": {"$exists": False}}},
         {"$addFields": {"_size": {"$binarySize": "$data"}}},
         {"$match": {"_size": {"$gte": MIN_BYTES}}},
         {"$limit": BATCH_SIZE},
@@ -118,6 +117,8 @@ async def convert_pngs_to_jxl() -> None:
         if jxl is None:
             stats["anomaly"] += 1
             JXL_CONVERSION.labels(outcome="size_anomaly").inc()
+            # Mark so the aggregation filter excludes it next cycle.
+            await col.update_one({"_id": doc_id}, {"$set": {"jxl_anomalous": True}})
             return
 
         await col.update_one(

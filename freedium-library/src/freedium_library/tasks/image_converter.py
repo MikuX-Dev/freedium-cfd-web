@@ -81,14 +81,7 @@ async def convert_pngs_to_jxl() -> None:
         pass
 
     docs = []
-    # Sort descending by _id so each cycle visits different docs — the
-    # content_type index otherwise returns docs in insertion order, which
-    # for image_cache is small widths first (all <50 KB → filtered to 0).
-    async for doc in (
-        col.find({"content_type": "image/png"})
-        .sort("_id", -1)
-        .limit(BATCH_SIZE)
-    ):
+    async for doc in col.find({"content_type": "image/png"}).limit(BATCH_SIZE):
         png_len = len(doc["data"])
         if png_len < MIN_BYTES:
             continue

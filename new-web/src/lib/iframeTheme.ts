@@ -58,6 +58,11 @@ export function applyTheme(iframe: HTMLIFrameElement, theme: "light" | "dark"): 
 		return false;
 	}
 	if (!doc?.documentElement) return false;
+	// When an srcdoc iframe is first inserted the browser briefly exposes
+	// an about:blank document (with an empty body) before replacing it with
+	// the actual srcdoc content. If we themed that transient document the
+	// subsequent srcdoc load would wipe our style. Skip empty/about:blank.
+	if (!doc.body || doc.body.childNodes.length === 0) return false;
 	const head = doc.head ?? doc.documentElement;
 	const existing = doc.getElementById(STYLE_ID);
 	if (theme === "dark") {

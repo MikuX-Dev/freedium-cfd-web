@@ -146,15 +146,10 @@ services:
       context: ..
       dockerfile: freedium-library/Dockerfile
     container_name: freedium-worker
-    # Metrics server runs in background (&) before the main TaskIQ worker.
-    # Module-level start would crash TaskIQ child processes on reload
-    # (port 8079 already bound by the parent).
     command:
-      - sh
-      - -c
-      - |
-        python3 -c "from freedium_library.tasks.metrics_server import start_metrics_server; start_metrics_server()" &
-        exec taskiq worker freedium_library.tasks:broker
+      - python3
+      - -m
+      - freedium_library.tasks.start_worker
     environment:
       - REDIS_URL=redis://redis:6379/0
       - MONGO_URL=mongodb://mongo:27017

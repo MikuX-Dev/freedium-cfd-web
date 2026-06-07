@@ -101,6 +101,7 @@ def log_errored_link(
 _RENDERED_LOG_PATH = os.environ.get(
     "RENDERED_LOG_PATH", "/var/log/freedium/rendered-links.jsonl"
 )
+_RENDERED_LOG_MAX_BYTES = 50 * 1024 * 1024  # rotate at 50 MB
 
 
 def log_successful_render(
@@ -116,6 +117,13 @@ def log_successful_render(
     every 200 response — both L2 cache hits and inline renders.
     """
     try:
+        # Rotate before writing if the file exceeds the threshold. Only one
+        # backup is kept (.1) — old data is in Loki anyway (30d retention).
+        try:
+            if os.path.getsize(_RENDERED_LOG_PATH) >= _RENDERED_LOG_MAX_BYTES:
+                os.replace(_RENDERED_LOG_PATH, _RENDERED_LOG_PATH + ".1")
+        except OSError:
+            pass
         record = {
             "url": url,
             "host": _normalize_host(url),

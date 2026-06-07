@@ -63,7 +63,7 @@ scrape_configs:
         labels:
           job: freedium
           source: rendered_links
-          __path__: /var/log/freedium/rendered-links.jsonl
+          __path__: /var/log/freedium/rendered-links.jsonl*
 
     pipeline_stages:
       # Flat JSON — one object per line, no loguru wrapping.

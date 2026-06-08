@@ -160,7 +160,7 @@ services:
       - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
       - JXL_BATCH_SIZE=100
-      - JXL_PARALLEL=4
+      - JXL_PARALLEL=2
       - JXL_MIN_BYTES=50000
     expose:
       - "8079"

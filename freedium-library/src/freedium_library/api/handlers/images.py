@@ -25,7 +25,7 @@ _ALLOWED_WIDTHS = {700, 800, 1400, 2000, 4000}
 # suffix like "@2x"). Never a slash/scheme; '@' sits in the URL path after
 # the hardcoded host, so it can't act as a userinfo separator.
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._*@-]{0,200}$")
-_img_config.MAX_BYTES = 15 * 1024 * 1024  # don't cache images larger than ~15MB
+# _MAX_BYTES now in _img_config.MAX_BYTES (Pydantic default: 15 MiB)
 
 # Strict raster allowlist. We serve these bytes from OUR origin, so an
 # image/svg+xml (which can carry <script>) would be stored XSS on our

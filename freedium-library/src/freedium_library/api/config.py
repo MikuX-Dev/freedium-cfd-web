@@ -1,5 +1,4 @@
-# freedium-library/src/freedium_library/api/config.py
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import Field
 
@@ -26,6 +25,33 @@ class APIConfig(BaseConfig):
     PDF_INTERNAL_SECRET: str = Field(
         default="dev-pdf-secret-change-in-prod",
         description="Shared secret required on POST /internal/pdf via X-Internal-Secret header.",
+    )
+
+
+class ImageProxyConfig(BaseConfig):
+    """Operational settings for the /img/{width}/{id} image proxy.
+
+    Security boundaries (allowlisted widths, content-type safelist, image-id
+    regex) are hardcoded in images.py — they should never be relaxed via env.
+    """
+
+    model_config = BaseSettingsConfigDict(env_prefix="IMAGE_")
+
+    SERVE_MODE: Literal["cache", "redirect"] = Field(
+        default="cache",
+        description="'cache' = Mongo-backed proxy; 'redirect' = 307 to CDN.",
+    )
+    CDN_BASE: str = Field(
+        default="https://miro.medium.com/v2/resize:fit",
+        description="Base URL for redirect mode (width/id appended as /{w}/{id}).",
+    )
+    MAX_BYTES: int = Field(
+        default=15 * 1024 * 1024,
+        description="Hard byte cap for upstream fetches on cache miss.",
+    )
+    UA: str = Field(
+        default="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/146 Safari/537.36",
+        description="User-Agent for upstream CDN fetches on cache miss.",
     )
 
 

@@ -25,7 +25,7 @@ _ALLOWED_WIDTHS = {700, 800, 1400, 2000, 4000}
 # suffix like "@2x"). Never a slash/scheme; '@' sits in the URL path after
 # the hardcoded host, so it can't act as a userinfo separator.
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._*@-]{0,200}$")
-_MAX_BYTES = 15 * 1024 * 1024  # don't cache images larger than ~15MB
+_img_config.MAX_BYTES = 15 * 1024 * 1024  # don't cache images larger than ~15MB
 
 # Strict raster allowlist. We serve these bytes from OUR origin, so an
 # image/svg+xml (which can carry <script>) would be stored XSS on our
@@ -40,7 +40,7 @@ _RESP_HEADERS = {
     "Content-Disposition": "inline",
 }
 
-_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/146 Safari/537.36"
+# _UA replaced by _img_config.UA (Pydantic ImageProxyConfig)
 
 _backend: ImageCacheBackend | None = None
 
@@ -88,11 +88,11 @@ def _jxl_to_jpeg(jxl: bytes) -> bytes:
             pass
 
 
-_SERVE_MODE = os.environ.get("IMAGE_SERVE_MODE", "cache")  # "cache" | "redirect"
+from freedium_library.api.config import ImageProxyConfig
 
-_CDN_BASE = "https://miro.medium.com/v2/resize:fit"
+_img_config = ImageProxyConfig()
 
-_REDIRECT_HEADERS = {
+_REDIRECT_HEADERS: dict[str, str] = {
     "Cache-Control": "public, max-age=31536000, immutable",
     "Referrer-Policy": "no-referrer",
 }
@@ -111,10 +111,10 @@ def register_images_router(app: FastAPI) -> None:
         if not _ID_RE.match(image_id):
             raise HTTPException(status_code=400, detail="invalid image id")
 
-        if _SERVE_MODE == "redirect":
+        if _img_config.SERVE_MODE == "redirect":
             from fastapi.responses import RedirectResponse
             return RedirectResponse(
-                url=f"{_CDN_BASE}:{width}/{image_id}",
+                url=f"{_img_config.CDN_BASE}:{width}/{image_id}",
                 status_code=307,
                 headers=_REDIRECT_HEADERS,
             )
@@ -180,7 +180,7 @@ def register_images_router(app: FastAPI) -> None:
                 proxy=_proxy(),
                 timeout=25.0,
                 follow_redirects=False,
-                headers={"User-Agent": _UA},
+                headers={"User-Agent": _img_config.UA},
             ) as client:
                 async with client.stream("GET", upstream) as resp:
                     if resp.status_code != 200:
@@ -192,14 +192,14 @@ def register_images_router(app: FastAPI) -> None:
                         raise HTTPException(status_code=502, detail="unsupported image type")
 
                     declared = resp.headers.get("content-length")
-                    if declared is not None and declared.isdigit() and int(declared) > _MAX_BYTES:
+                    if declared is not None and declared.isdigit() and int(declared) > _img_config.MAX_BYTES:
                         raise HTTPException(status_code=502, detail="image too large")
 
                     chunks: list[bytes] = []
                     total = 0
                     async for chunk in resp.aiter_bytes():
                         total += len(chunk)
-                        if total > _MAX_BYTES:
+                        if total > _img_config.MAX_BYTES:
                             raise HTTPException(status_code=502, detail="image too large")
                         chunks.append(chunk)
                     data = b"".join(chunks)

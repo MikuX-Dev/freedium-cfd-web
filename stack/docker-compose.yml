@@ -64,7 +64,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
       - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
-      - IMAGE_SERVE_MODE=${IMAGE_SERVE_MODE:-cache}
+      - IMAGE_SERVE_MODE=redirect
     volumes:
       - errored_logs:/var/log/freedium
     depends_on:

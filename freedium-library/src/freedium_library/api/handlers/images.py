@@ -88,6 +88,16 @@ def _jxl_to_jpeg(jxl: bytes) -> bytes:
             pass
 
 
+_SERVE_MODE = os.environ.get("IMAGE_SERVE_MODE", "cache")  # "cache" | "redirect"
+
+_CDN_BASE = "https://miro.medium.com/v2/resize:fit"
+
+_REDIRECT_HEADERS = {
+    "Cache-Control": "public, max-age=31536000, immutable",
+    "Referrer-Policy": "no-referrer",
+}
+
+
 def _proxy() -> str | None:
     first = os.environ.get("PROXY_LIST", "").split(",")[0].strip()
     return first or None
@@ -100,6 +110,14 @@ def register_images_router(app: FastAPI) -> None:
             raise HTTPException(status_code=400, detail="unsupported width")
         if not _ID_RE.match(image_id):
             raise HTTPException(status_code=400, detail="invalid image id")
+
+        if _SERVE_MODE == "redirect":
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(
+                url=f"{_CDN_BASE}:{width}/{image_id}",
+                status_code=307,
+                headers=_REDIRECT_HEADERS,
+            )
 
         key = f"{width}:{image_id}"
         backend = _get_backend()

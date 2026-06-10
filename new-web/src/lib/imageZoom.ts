@@ -28,7 +28,9 @@ opacity:0;transition:opacity .15s ease;}
 .fz-lightbox.fz-open{opacity:1;}
 .fz-lightbox[hidden]{display:none;}
 .fz-lightbox-img{max-width:100%;max-height:100%;object-fit:contain;
-box-shadow:0 8px 50px rgba(0,0,0,.5);border-radius:2px;}
+box-shadow:0 8px 50px rgba(0,0,0,.5);border-radius:2px;
+transition:filter .35s ease;}
+.fz-lightbox-img.fz-loading{filter:blur(10px);}
 .fz-lightbox-caption{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
 color:rgba(255,255,255,.82);font-size:13px;line-height:1.5;max-width:min(640px,84%);
 text-align:center;padding:6px 16px;background:rgba(20,20,20,.45);
@@ -129,18 +131,20 @@ function renderImage(img: HTMLImageElement): void {
 	overlayImg.alt = img.alt || "";
 
 	// Upgrade to the best available resolution: the data-zoom-src (4000px,
-	// served + cached via our /img proxy) directly, else a 2000px variant
-	// derived from the displayed src. Non-blocking — `loaded` (already
-	// decoded) shows instantly and this swaps in when ready, so it can't hang.
+	// served via /img) directly, else a 2000px variant. Low-res shows
+	// instantly with a blur; when the high-res arrives, the blur crossfades
+	// out — no jarring "surprise" resolution pop.
 	const hi = img.dataset.zoomSrc || highResVariant(img.src || "");
 	if (hi && hi !== loaded) {
+		overlayImg.classList.add("fz-loading");
 		const pre = new Image();
 		pre.onload = () => {
-			// Only apply if we're still showing this image (guards fast paging).
 			if (overlay && !overlay.hidden && overlayImg && gallery[currentIndex] === img) {
 				overlayImg.src = hi;
+				overlayImg.classList.remove("fz-loading");
 			}
 		};
+		pre.onerror = () => overlayImg?.classList.remove("fz-loading");
 		pre.src = hi;
 	}
 

@@ -59,13 +59,7 @@ else
   recover disk
 fi
 
-# --- memory ---
-mem=$(free 2>/dev/null | awk '/^Mem:/{printf "%d",$3/$2*100}'); mem=${mem:-0}
-if [ "$mem" -ge "$MEM_WARN" ]; then
-  alert mem "⚠️ <b>$HOST</b> memory <b>${mem}%</b> used (≥${MEM_WARN}%)."
-else
-  recover mem
-fi
+# --- memory (disabled) ---
 
 # --- critical single-container services ---
 for c in $CRITICAL_CONTAINERS; do

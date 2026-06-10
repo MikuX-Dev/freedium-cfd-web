@@ -26,7 +26,7 @@ CRITICAL_CONTAINERS=${CRITICAL_CONTAINERS:-"freedium-backend freedium-mongo free
 
 STATE_DIR=/var/lib/freedium-monitor
 mkdir -p "$STATE_DIR"
-HOST=$(hostname)
+HOST="Freedium"
 
 tg() {
   curl -s --max-time 10 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \

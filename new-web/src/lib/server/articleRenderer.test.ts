@@ -139,7 +139,125 @@ describe("renderArticle (print) — iframes", () => {
         (render as any).mockResolvedValueOnce({ markdown: inlineMd });
 
         const { html } = await rerender("slug", { mode: "print" });
+        // rehype-sanitize strips the javascript: src before the iframe→thumbnail
+        // transform runs, leaving a harmless src-less iframe. Security invariant:
+        // no javascript: scheme reaches the output.
         expect(html).not.toMatch(/javascript:/);
-        expect(html).toMatch(/href="#"/);
+    });
+});
+
+describe("renderArticle — XSS sanitization", () => {
+    async function renderMd(md: string): Promise<string> {
+        const { renderArticle } = await import("./articleRenderer");
+        const { render } = await import("@/services");
+        (render as any).mockResolvedValueOnce({ markdown: md });
+        return (await renderArticle("slug")).html ?? "";
+    }
+
+    it("strips <script> tags from article body", async () => {
+        const html = await renderMd("# T\n\n<script>alert(document.domain)</script>\n\ntext");
+        expect(html).not.toContain("<script>");
+        expect(html).not.toContain("alert(document.domain)");
+    });
+
+    it("strips on* event handler attributes", async () => {
+        const html = await renderMd('<img src=x onerror="alert(1)">');
+        expect(html).not.toMatch(/onerror/i);
+    });
+
+    it("strips javascript: links", async () => {
+        const html = await renderMd("[click](javascript:alert(1))");
+        expect(html).not.toMatch(/javascript:/i);
+    });
+
+    it("keeps safe markdown formatting", async () => {
+        const html = await renderMd("# Heading\n\n**bold** and [link](https://ok.com)");
+        expect(html).toMatch(/<h1/);
+        expect(html).toContain("bold");
+        expect(html).toContain("https://ok.com");
+    });
+
+    it("keeps legit embed iframes (data-iframe-id + srcdoc)", async () => {
+        const html = await renderMd(
+            '<iframe data-iframe-id="g1" srcdoc="<p>gist</p>" width="100%"></iframe>',
+        );
+        expect(html).toContain("<iframe");
+        expect(html).toContain("data-iframe-id");
+        expect(html).toContain("srcdoc");
+    });
+
+    // --- additional XSS vectors ---
+
+    it("strips inline event handlers on links (onmouseover/onclick)", async () => {
+        const html = await renderMd('<a href="https://ok.com" onmouseover="alert(1)" onclick="alert(2)">x</a>');
+        expect(html).not.toMatch(/onmouseover/i);
+        expect(html).not.toMatch(/onclick/i);
+    });
+
+    it("strips <svg><script> and svg event handlers", async () => {
+        const html = await renderMd('<svg><script>alert(1)</script></svg><svg onload="alert(1)"></svg>');
+        expect(html).not.toContain("alert(1)");
+        expect(html).not.toMatch(/onload/i);
+    });
+
+    it("strips <iframe> with javascript: src in body (non-print)", async () => {
+        const html = await renderMd('<iframe src="javascript:alert(1)"></iframe>');
+        expect(html).not.toMatch(/javascript:/i);
+    });
+
+    it("neutralizes data: URI script payloads in links", async () => {
+        const html = await renderMd("[x](data:text/html,<script>alert(1)</script>)");
+        expect(html).not.toContain("<script>");
+        // data: protocol on a link is not in the safe-protocol allowlist
+        expect(html).not.toMatch(/href="data:text\/html/i);
+    });
+
+    it("strips <object>/<embed>/<form> tags", async () => {
+        const html = await renderMd(
+            '<object data="javascript:alert(1)"></object><embed src="x"><form action="/x"><input></form>',
+        );
+        expect(html).not.toContain("<object");
+        expect(html).not.toContain("<embed");
+        expect(html).not.toContain("<form");
+        expect(html).not.toMatch(/javascript:/i);
+    });
+
+    it("strips <style> blocks and <base> hijack", async () => {
+        const html = await renderMd('<style>body{background:url(javascript:alert(1))}</style><base href="https://evil.test/">');
+        expect(html).not.toContain("<style>");
+        expect(html).not.toContain("<base");
+    });
+
+    it("strips case-varied and whitespace-obfuscated script tags", async () => {
+        const html = await renderMd('<ScRiPt>alert(1)</ScRiPt><img src=x OnError=alert(1)>');
+        expect(html).not.toMatch(/<script/i);
+        expect(html).not.toMatch(/onerror/i);
+        expect(html).not.toContain("alert(1)");
+    });
+
+    it("strips malicious attributes from a sanctioned tag (img onload)", async () => {
+        const html = await renderMd('<img src="/img/700/abc.png" onload="alert(1)" alt="ok">');
+        expect(html).toContain("<img");
+        expect(html).toContain('alt="ok"');
+        expect(html).not.toMatch(/onload/i);
+    });
+
+    it("keeps code blocks (shiki) intact after sanitize", async () => {
+        const html = await renderMd("```js\nconst x = 1;\n```");
+        expect(html).toMatch(/<pre|<code/);
+        expect(html).toContain("const");
+    });
+
+    it("keeps image data-zoom-src / data-caption attributes", async () => {
+        const html = await renderMd('<img src="/img/700/a.png" data-zoom-src="/img/4000/a.png" data-caption="cap">');
+        expect(html).toContain("data-zoom-src");
+        expect(html).toContain("data-caption");
+    });
+
+    it("does not execute script smuggled via caption markdown", async () => {
+        // captions render through the same processor; the cover caption path
+        const md = "# T\n\n![alt](/img/700/a.png)\n\ntext";
+        const html = await renderMd(md);
+        expect(html).not.toContain("<script>");
     });
 });

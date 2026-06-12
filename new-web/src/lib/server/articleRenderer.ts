@@ -2,6 +2,8 @@ import { render } from "@/services";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
 import { createHighlighter, type HighlighterGeneric, type BundledLanguage, type BundledTheme } from "shiki";
 import { visit } from "unist-util-visit";
@@ -51,6 +53,51 @@ const HIGHLIGHT_CONFIG = {
 	themes: ["github-light", "github-dark"],
 	langs: Object.keys(bundledLanguages),
 };
+
+// Sanitize schema for the article body. Extends rehype-sanitize's default
+// (GitHub) schema — which already strips <script>, on* event handlers, and
+// dangerous URL protocols — to additionally permit the structural HTML
+// Freedium legitimately emits in the markdown body (embed iframes, image
+// data-attributes, ids/classes/styles). Attribute names use hast's camelCase
+// property form (srcDoc, frameBorder, dataIframeId, …), not raw HTML names.
+const FREEDIUM_SANITIZE_SCHEMA: typeof defaultSchema = (() => {
+	const s = structuredClone(defaultSchema);
+	s.tagNames = [...new Set([...(s.tagNames ?? []), "iframe"])];
+	s.attributes = {
+		...s.attributes,
+		"*": [
+			...(s.attributes?.["*"] ?? []),
+			"className",
+			"id",
+			"style",
+			"dataIframeId",
+			"dataZoomSrc",
+			"dataCaption",
+			"dataNosnippet",
+		],
+		iframe: [
+			"src",
+			"srcDoc",
+			"sandbox",
+			"width",
+			"height",
+			"style",
+			"loading",
+			"title",
+			"allow",
+			"frameBorder",
+			"dataIframeId",
+		],
+		img: [
+			...(s.attributes?.img ?? []),
+			"dataZoomSrc",
+			"dataCaption",
+			"loading",
+			"className",
+		],
+	};
+	return s;
+})();
 
 const CODE_ATTRIBUTES: Record<string, string> = {
 	contenteditable: "true",
@@ -536,6 +583,15 @@ export async function renderArticle(
 	const baseProcessor = unified()
 		.use(remarkParse)
 		.use(remarkRehype, { allowDangerousHtml: true })
+		// SECURITY: article body is attacker-controlled (any Medium author can
+		// embed raw <script>/<img onerror>/javascript: in their post text).
+		// rehypeRaw parses the raw HTML into HAST; rehypeSanitize then strips
+		// scripts, event handlers, and dangerous URL protocols. MUST run before
+		// the trusted injectors below (link icons, shiki, copy buttons) so their
+		// output isn't stripped. Without this, the {@html content} sink is a
+		// stored-XSS hole (cache-poisoned per article).
+		.use(rehypeRaw)
+		.use(rehypeSanitize, FREEDIUM_SANITIZE_SCHEMA)
 		.use(rehypeSlug)
 		.use(rehypeCollectToc, tocAcc)
 		.use(rehypeExternalLinks, {

@@ -120,6 +120,20 @@ describe("renderArticle (print) — iframes", () => {
         expect(html).toMatch(/img\.youtube\.com\/vi\/abcdefghijk\/maxresdefault\.jpg/);
     });
 
+    it("neutralizes a srcdoc <script> iframe in print mode (no execution)", async () => {
+        const inlineMd = `<iframe data-iframe-id="x" srcdoc="<script>alert(1)</script>"></iframe>`;
+        const { renderArticle: rerender } = await import("./articleRenderer");
+        const { render } = await import("@/services");
+        (render as any).mockResolvedValueOnce({ markdown: inlineMd });
+        const { html } = await rerender("slug", { mode: "print" });
+        // No src → thumbnail transform skips; sandbox (allow-same-origin, no
+        // allow-scripts) still applied, so the srcdoc script can't run.
+        if (html?.includes("<iframe")) {
+            expect(html).toMatch(/sandbox="allow-same-origin"/);
+            expect(html).not.toMatch(/sandbox="[^"]*allow-scripts/);
+        }
+    });
+
     it("HTML-escapes the src in non-YouTube iframe fallback", async () => {
         const inlineMd = `<iframe src="https://example.com/?q=&lt;evil&gt;"></iframe>`;
         const { renderArticle: rerender } = await import("./articleRenderer");
@@ -270,6 +284,30 @@ describe("renderArticle — XSS sanitization", () => {
         );
         expect(html).not.toMatch(/allow-scripts/);
         expect(html).toMatch(/sandbox="allow-same-origin"/);
+    });
+
+    it("sandboxes external-src iframes too (not just srcdoc)", async () => {
+        const html = await renderMd('<iframe src="https://example.com/embed"></iframe>');
+        expect(html).toContain("<iframe");
+        expect(html).toMatch(/sandbox="allow-same-origin"/);
+    });
+
+    it("sandboxes every iframe when multiple are present", async () => {
+        const html = await renderMd(
+            '<iframe data-iframe-id="a" srcdoc="<p>1</p>"></iframe>\n\n' +
+                '<iframe data-iframe-id="b" srcdoc="<p>2</p>"></iframe>',
+        );
+        const sandboxes = html.match(/sandbox="allow-same-origin"/g) ?? [];
+        expect(sandboxes.length).toBe(2);
+    });
+
+    it("preserves iframe layout attributes through sanitize", async () => {
+        const html = await renderMd(
+            '<iframe data-iframe-id="x" srcdoc="<p>g</p>" width="100%" height="320" loading="lazy"></iframe>',
+        );
+        expect(html).toMatch(/width="100%"/);
+        expect(html).toMatch(/height="320"/);
+        expect(html).toMatch(/loading="lazy"/);
     });
 
     it("does not execute script smuggled via caption markdown", async () => {

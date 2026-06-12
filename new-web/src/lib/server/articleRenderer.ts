@@ -65,11 +65,12 @@ const FREEDIUM_SANITIZE_SCHEMA: typeof defaultSchema = (() => {
 	s.tagNames = [...new Set([...(s.tagNames ?? []), "iframe"])];
 	s.attributes = {
 		...s.attributes,
+		// Note: id/style intentionally NOT wildcard-allowed (DOM-clobbering /
+		// CSS-exfil surface). Heading ids are added by rehypeSlug *after*
+		// sanitize; shiki inline styles are injected after sanitize too.
 		"*": [
 			...(s.attributes?.["*"] ?? []),
 			"className",
-			"id",
-			"style",
 			"dataIframeId",
 			"dataZoomSrc",
 			"dataCaption",
@@ -374,6 +375,22 @@ function transformIframeHtml(iframeHtml: string): string {
 	return buildIframeFallbackLink(src);
 }
 
+/** Force sandbox="allow-same-origin" on every iframe (runs AFTER sanitize so
+ * it's authoritative — an attacker can't pre-set allow-scripts in markdown).
+ * allow-same-origin (NOT allow-scripts) lets the parent inject dark-theme CSS
+ * into the srcdoc document (iframeTheme.ts) while preventing any <script>
+ * inside a malicious srcdoc from executing. Closes the srcdoc XSS vector that
+ * allowlisting srcDoc would otherwise open. */
+function rehypeSandboxIframes() {
+	return (tree: Root) => {
+		visit(tree, "element", (node: Element) => {
+			if (node.tagName === "iframe") {
+				node.properties = { ...node.properties, sandbox: "allow-same-origin" };
+			}
+		});
+	};
+}
+
 function rehypeIframeToThumbnail() {
 	return (tree: Root) => {
 		// Iframes appear as either:
@@ -592,6 +609,7 @@ export async function renderArticle(
 		// stored-XSS hole (cache-poisoned per article).
 		.use(rehypeRaw)
 		.use(rehypeSanitize, FREEDIUM_SANITIZE_SCHEMA)
+		.use(rehypeSandboxIframes)
 		.use(rehypeSlug)
 		.use(rehypeCollectToc, tocAcc)
 		.use(rehypeExternalLinks, {

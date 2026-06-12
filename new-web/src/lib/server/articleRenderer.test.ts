@@ -254,6 +254,24 @@ describe("renderArticle — XSS sanitization", () => {
         expect(html).toContain("data-caption");
     });
 
+    it("forces sandbox=allow-same-origin on iframes (neuters srcdoc <script>)", async () => {
+        const html = await renderMd(
+            '<iframe data-iframe-id="x" srcdoc="<script>alert(1)</script>"></iframe>',
+        );
+        expect(html).toContain("<iframe");
+        expect(html).toMatch(/sandbox="allow-same-origin"/);
+        // allow-same-origin without allow-scripts → the srcdoc script can't run
+        expect(html).not.toMatch(/sandbox="[^"]*allow-scripts/);
+    });
+
+    it("overrides attacker-supplied iframe sandbox (no allow-scripts)", async () => {
+        const html = await renderMd(
+            '<iframe sandbox="allow-scripts allow-same-origin" srcdoc="<script>alert(1)</script>"></iframe>',
+        );
+        expect(html).not.toMatch(/allow-scripts/);
+        expect(html).toMatch(/sandbox="allow-same-origin"/);
+    });
+
     it("does not execute script smuggled via caption markdown", async () => {
         // captions render through the same processor; the cover caption path
         const md = "# T\n\n![alt](/img/700/a.png)\n\ntext";

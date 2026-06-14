@@ -76,5 +76,5 @@ def register_memtrace_router(router: APIRouter, secret: str) -> None:
         }
 
     router.add_api_route(
-        "/internal/memtrace", memtrace, methods=["GET"], include_in_schema=False
+        "/memtrace", memtrace, methods=["GET"], include_in_schema=False
     )

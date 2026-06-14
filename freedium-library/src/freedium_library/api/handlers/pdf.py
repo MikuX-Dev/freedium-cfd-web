@@ -50,8 +50,9 @@ def _make_secret_dep(expected_secret: str):
 
 
 def register_pdf_router(router: APIRouter, secret: str) -> None:
-    """Add POST /pdf onto the given internal router (mounted at /internal).
-    `secret` is the expected X-Internal-Secret header value."""
+    """Mount POST /internal/pdf under `router`. `secret` is the expected
+    value of the X-Internal-Secret header - typically read from config."""
+    pdf_router = APIRouter(prefix="/internal")
     require_secret = _make_secret_dep(secret)
 
     @beartype
@@ -85,7 +86,7 @@ def register_pdf_router(router: APIRouter, secret: str) -> None:
                 },
             )
 
-    router.add_api_route(
+    pdf_router.add_api_route(
         "/pdf",
         endpoint=_generate_pdf,
         methods=["POST"],
@@ -101,3 +102,5 @@ def register_pdf_router(router: APIRouter, secret: str) -> None:
         ),
         tags=["internal"],
     )
+
+    router.include_router(pdf_router)

@@ -22,7 +22,7 @@ from __future__ import annotations
 import os
 import tracemalloc
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 
 # Per-process baseline snapshot (one per worker).
 _baseline: tracemalloc.Snapshot | None = None
@@ -39,7 +39,13 @@ def _rss_mb() -> float:
     return 0.0
 
 
-def register_memtrace_router(router: APIRouter, secret: str) -> None:
+def register_memtrace_router(app: FastAPI, secret: str) -> None:
+    """Mount GET /internal/memtrace directly on the app (not via an APIRouter
+    + include_router). FastAPI 0.137's include_router appends an
+    _IncludedRouter object that prometheus_fastapi_instrumentator 8.0's route
+    resolver crashes on (no .path). App-level routes are plain APIRoutes the
+    instrumentator handles — same approach as the /img proxy."""
+
     def require_secret(x_internal_secret: str = Header(..., alias="X-Internal-Secret")) -> None:
         if x_internal_secret != secret:
             raise HTTPException(status_code=403, detail="Forbidden")
@@ -75,6 +81,6 @@ def register_memtrace_router(router: APIRouter, secret: str) -> None:
             ],
         }
 
-    router.add_api_route(
-        "/memtrace", memtrace, methods=["GET"], include_in_schema=False
+    app.add_api_route(
+        "/internal/memtrace", memtrace, methods=["GET"], include_in_schema=False
     )

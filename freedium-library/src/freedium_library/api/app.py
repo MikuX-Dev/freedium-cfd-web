@@ -74,6 +74,11 @@ def create_application() -> FastAPI:
 
     register_images_router(app)
 
+    from freedium_library.api.config import APIConfig as _APIConfig
+    from freedium_library.api.handlers.memtrace import register_memtrace_router
+
+    register_memtrace_router(app, secret=(config or _APIConfig()).PDF_INTERNAL_SECRET)
+
     register_router(app, settings.prefix_path, config=config)
 
     @app.get("/healthz", include_in_schema=False)

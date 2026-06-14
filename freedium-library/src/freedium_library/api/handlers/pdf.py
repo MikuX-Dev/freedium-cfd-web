@@ -51,8 +51,12 @@ def _make_secret_dep(expected_secret: str):
 
 def register_pdf_router(router: APIRouter, secret: str) -> None:
     """Mount POST /internal/pdf under `router`. `secret` is the expected
-    value of the X-Internal-Secret header - typically read from config."""
-    pdf_router = APIRouter(prefix="/internal")
+    value of the X-Internal-Secret header - typically read from config.
+
+    Added directly via add_api_route (not a sub-router + include_router):
+    include_router inserts a FastAPI _IncludedRouter object into app.routes
+    that prometheus_fastapi_instrumentator's route-name resolver crashes on
+    ('_IncludedRouter' has no attribute 'path'). Direct routes avoid it."""
     require_secret = _make_secret_dep(secret)
 
     @beartype
@@ -86,8 +90,8 @@ def register_pdf_router(router: APIRouter, secret: str) -> None:
                 },
             )
 
-    pdf_router.add_api_route(
-        "/pdf",
+    router.add_api_route(
+        "/internal/pdf",
         endpoint=_generate_pdf,
         methods=["POST"],
         summary="Generate PDF from HTML (internal)",
@@ -102,5 +106,3 @@ def register_pdf_router(router: APIRouter, secret: str) -> None:
         ),
         tags=["internal"],
     )
-
-    router.include_router(pdf_router)

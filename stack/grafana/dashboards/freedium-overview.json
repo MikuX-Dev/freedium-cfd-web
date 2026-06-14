@@ -707,6 +707,36 @@
           ]
         }
       }
+    },
+    {
+      "id": 28,
+      "type": "timeseries",
+      "title": "Container memory (RSS) \u2014 leak watch",
+      "gridPos": {
+        "x": 0,
+        "y": 124,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "topk(8, container_memory_rss{name=~\"freedium-.+\"}) / 1024 / 1024",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes",
+          "custom": {
+            "fillOpacity": 5
+          }
+        }
+      }
     }
   ]
 }

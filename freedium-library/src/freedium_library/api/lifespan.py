@@ -58,6 +58,16 @@ async def _warmup_recent_feed(
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     register_error_log_sink()
 
+    # Memory-leak diagnostics: TRACEMALLOC=1 enables per-worker allocation
+    # tracking, surfaced via GET /internal/memtrace (secret-gated). Off by
+    # default — tracemalloc adds ~5-10% overhead.
+    import os
+
+    if os.environ.get("TRACEMALLOC", "").lower() in ("1", "true"):
+        import tracemalloc
+
+        tracemalloc.start(25)
+
     # Migrate the non-article domain denylist into Mongo when empty (ops own
     # it thereafter). Best-effort: never crash startup over it.
     from freedium_library.api.blocked_domains import seed_blocked_domains

@@ -65,6 +65,7 @@ services:
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
       - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
       - IMAGE_SERVE_MODE=redirect
+      - TRACEMALLOC=${TRACEMALLOC:-1}
     volumes:
       - errored_logs:/var/log/freedium
     depends_on:
@@ -217,6 +218,28 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - freedium_obs_net
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: freedium-cadvisor
+    command:
+      - "--housekeeping_interval=30s"
+      - "--docker_only=true"
+      - "--store_container_labels=false"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    privileged: true
+    expose:
+      - "8080"
     networks:
       - freedium_obs_net
     restart: unless-stopped

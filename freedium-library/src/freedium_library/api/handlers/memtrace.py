@@ -40,13 +40,10 @@ def _rss_mb() -> float:
 
 
 def register_memtrace_router(router: APIRouter, secret: str) -> None:
-    mt_router = APIRouter(prefix="/internal")
-
     def require_secret(x_internal_secret: str = Header(..., alias="X-Internal-Secret")) -> None:
         if x_internal_secret != secret:
             raise HTTPException(status_code=403, detail="Forbidden")
 
-    @mt_router.get("/memtrace", include_in_schema=False)
     async def memtrace(_: None = Depends(require_secret)):
         global _baseline
         if not tracemalloc.is_tracing():
@@ -78,4 +75,6 @@ def register_memtrace_router(router: APIRouter, secret: str) -> None:
             ],
         }
 
-    router.include_router(mt_router)
+    router.add_api_route(
+        "/internal/memtrace", memtrace, methods=["GET"], include_in_schema=False
+    )

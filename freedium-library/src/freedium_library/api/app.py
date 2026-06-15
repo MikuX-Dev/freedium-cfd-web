@@ -90,6 +90,23 @@ def create_application() -> FastAPI:
 
     app.openapi = lambda: custom_openapi(app)
 
+    # prometheus-fastapi-instrumentator's route-name resolver does
+    # `route.path`, which AttributeErrors on FastAPI >=0.137's _IncludedRouter
+    # (inserted by include_router). That 500s EVERY /api/* request. Guard the
+    # resolver so a label-resolution failure degrades to an unlabeled metric
+    # instead of crashing the request.
+    import prometheus_fastapi_instrumentator.routing as _pfi_routing
+
+    _orig_get_route_name = _pfi_routing.get_route_name
+
+    def _safe_get_route_name(request):
+        try:
+            return _orig_get_route_name(request)
+        except AttributeError:
+            return None
+
+    _pfi_routing.get_route_name = _safe_get_route_name
+
     Instrumentator(
         excluded_handlers=["/metrics", "/healthz"],
         should_group_status_codes=False,

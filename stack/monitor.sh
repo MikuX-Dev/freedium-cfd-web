@@ -77,3 +77,21 @@ if [ "$web_ok" -lt 1 ]; then
 else
   recover web
 fi
+
+# --- synthetic render probe: catches "healthy but every article 500s" ---
+# Containers can all report healthy (/healthz is trivial) while article
+# rendering is broken (e.g. the instrumentator _IncludedRouter 500 that hid
+# for 17h). Probe the real backend render path for a known-cached article and
+# assert it returns a 200 with markdown — not a 5xx/empty.
+PROBE_ID="${RENDER_PROBE_ID:-450a855584f8}"
+probe_code=$(docker exec freedium-backend curl -s -o /tmp/_probe.out -w "%{http_code}" \
+  -X POST http://localhost:7080/api/render \
+  -H "content-type: application/json" \
+  -d "{\"content\":\"${PROBE_ID}\"}" --max-time 30 2>/dev/null || echo 000)
+probe_len=$(docker exec freedium-backend sh -c 'wc -c < /tmp/_probe.out 2>/dev/null' 2>/dev/null | tr -dc '0-9')
+probe_len=${probe_len:-0}
+if [ "$probe_code" = "200" ] && [ "$probe_len" -gt 500 ]; then
+  recover render
+else
+  alert render "🔴 <b>$HOST</b> render path broken: /api/render → HTTP ${probe_code}, ${probe_len}B (containers may report healthy)."
+fi

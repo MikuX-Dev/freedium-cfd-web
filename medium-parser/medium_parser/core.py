@@ -302,24 +302,42 @@ class MediumParser:
             else:
                 text_formater = parse_paragraph_text("", [])
 
+            raw_text = paragraph["text"] or ""
             for highlight in highlights:
-                for highlight_paragraph in highlight["paragraphs"]:
-                    if highlight_paragraph["name"] == paragraph["name"]:
-                        logger.trace("Apply highlight to this paragraph")
-                        if highlight_paragraph["text"] != text_formater.get_text():
-                            logger.warning(
-                                "Highlighted text and paragraph text are not the same! Skip..."
-                            )
-                            break
-                        quote_markup_template = (
-                            '<mark class="bg-emerald-300">{{ text }}</mark>'
-                        )
-                        text_formater.set_template(
-                            highlight["startOffset"],
-                            highlight["endOffset"],
-                            quote_markup_template,
-                        )
-                        break
+                hl_paras = highlight.get("paragraphs") or []
+                hl_names = [hp.get("name") for hp in hl_paras]
+                if paragraph["name"] not in hl_names:
+                    continue
+                # The highlight's own copy of the paragraph must match the body
+                # paragraph's RAW text — the offsets index that raw text. (Earlier
+                # this compared against text_formater.get_text(), which is the
+                # HTML-escaped/quote-converted render, so any paragraph with a
+                # quote/&/</> wrongly failed the check and the highlight was dropped.)
+                hp = hl_paras[hl_names.index(paragraph["name"])]
+                if (hp.get("text") or "") != raw_text:
+                    logger.warning("Highlight paragraph text mismatch; skip")
+                    continue
+
+                # A highlight can span multiple paragraphs: startOffset applies to
+                # the first, endOffset to the last, and any paragraph in between is
+                # fully highlighted. For a single-paragraph highlight both apply.
+                n = len(raw_text)
+                is_first = paragraph["name"] == hl_names[0]
+                is_last = paragraph["name"] == hl_names[-1]
+                start = highlight["startOffset"] if is_first else 0
+                end = highlight["endOffset"] if is_last else n
+                # Clamp defensively — never trust upstream offsets.
+                start = max(0, min(start, n))
+                end = max(0, min(end, n))
+                if start >= end:
+                    continue
+
+                logger.trace("Apply highlight to this paragraph")
+                text_formater.set_template(
+                    start,
+                    end,
+                    '<mark class="bg-emerald-300 dark:bg-emerald-700 dark:text-white">{{ text }}</mark>',
+                )
 
             if paragraph["type"] == "H2":
                 css_class = []

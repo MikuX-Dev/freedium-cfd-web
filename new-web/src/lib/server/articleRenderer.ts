@@ -62,7 +62,9 @@ const HIGHLIGHT_CONFIG = {
 // property form (srcDoc, frameBorder, dataIframeId, …), not raw HTML names.
 const FREEDIUM_SANITIZE_SCHEMA: typeof defaultSchema = (() => {
 	const s = structuredClone(defaultSchema);
-	s.tagNames = [...new Set([...(s.tagNames ?? []), "iframe"])];
+	// "mark" = Medium highlights (<mark class="bg-emerald-...">); not in the
+	// default schema, so without this the highlight wrapper is stripped.
+	s.tagNames = [...new Set([...(s.tagNames ?? []), "iframe", "mark"])];
 	s.attributes = {
 		...s.attributes,
 		// Note: id/style intentionally NOT wildcard-allowed (DOM-clobbering /

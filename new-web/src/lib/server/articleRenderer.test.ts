@@ -184,6 +184,12 @@ describe("renderArticle — XSS sanitization", () => {
         expect(html).not.toMatch(/javascript:/i);
     });
 
+    it("keeps <mark> highlight tags (Medium highlights)", async () => {
+        const html = await renderMd('<p>before <mark class="bg-emerald-300">highlighted</mark> after</p>');
+        expect(html).toContain("<mark");
+        expect(html).toContain("highlighted");
+    });
+
     it("keeps safe markdown formatting", async () => {
         const html = await renderMd("# Heading\n\n**bold** and [link](https://ok.com)");
         expect(html).toMatch(/<h1/);

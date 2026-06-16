@@ -279,6 +279,10 @@ services:
   prometheus:
     image: prom/prometheus:v3.1.0
     container_name: freedium-prometheus
+    # Prometheus runs as nobody; add the host docker group (GID 990) so it can
+    # read the socket for backend replica discovery (docker_sd_configs).
+    group_add:
+      - "990"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prom_data:/prometheus

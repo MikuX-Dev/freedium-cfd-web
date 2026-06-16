@@ -52,6 +52,29 @@ class TestMarkupProcessor:
         processor = MarkupProcessor("Hello world", markups)
         assert processor.render() == "Hello _world_"
 
+    def test_highlight_markup(self) -> None:
+        markups: list[MarkupDict] = [{"type": "HIGHLIGHT", "start": 0, "end": 5}]
+        processor = MarkupProcessor("Hello world", markups)
+        out = processor.render()
+        assert out.startswith("<mark")
+        assert "Hello" in out
+        assert out.endswith("world") or "</mark> world" in out
+
+    def test_highlight_overflow_clamped(self) -> None:
+        # end beyond text length must clamp, not crash
+        markups: list[MarkupDict] = [{"type": "HIGHLIGHT", "start": 0, "end": 9999}]
+        out = MarkupProcessor("Hello world", markups).render()
+        assert out.startswith("<mark")
+        assert "Hello world" in out
+        assert out.rstrip().endswith("</mark>")
+
+    def test_highlight_degenerate_range_dropped(self) -> None:
+        # start >= end produces no highlight, no crash
+        markups: list[MarkupDict] = [{"type": "HIGHLIGHT", "start": 5, "end": 5}]
+        out = MarkupProcessor("Hello world", markups).render()
+        assert "<mark" not in out
+        assert out == "Hello world"
+
     def test_code_markup(self) -> None:
         markups: list[MarkupDict] = [{"type": "CODE", "start": 0, "end": 5}]
         processor = MarkupProcessor("Hello world", markups)

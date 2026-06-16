@@ -186,6 +186,12 @@ fn process_markups(text: &str, markups: Vec<Bound<'_, PyDict>>, is_code: bool) -
                 let url = format!("https://medium.com/u/{}", user_id);
                 markup_ranges.push((start, end, markup_type, MarkupSpan { start, end, prefix: "[".to_string(), suffix: format!("]({})", url) }));
             }
+        } else if markup_type == "HIGHLIGHT" {
+            // Synthetic type injected from the post's separate `highlights`
+            // array. Raw-HTML <mark> wrapper (frontend allowlists <mark>).
+            // start/end already clamped above; no priority filtering — a
+            // highlight may overlap any markup, split_overlapping nests them.
+            markup_ranges.push((start, end, markup_type, MarkupSpan { start, end, prefix: "<mark class=\"bg-emerald-300 dark:bg-emerald-700 dark:text-white\">".to_string(), suffix: "</mark>".to_string() }));
         }
     }
 

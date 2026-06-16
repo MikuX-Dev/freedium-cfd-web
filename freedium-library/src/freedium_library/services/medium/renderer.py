@@ -60,6 +60,9 @@ class MarkupType:
     STRONG: Final[str] = "STRONG"
     EM: Final[str] = "EM"
     CODE: Final[str] = "CODE"
+    # Synthetic type (not from Medium's markup list — injected from the post's
+    # separate `highlights` array). Renders the highlighted range as <mark>.
+    HIGHLIGHT: Final[str] = "HIGHLIGHT"
 
 
 # Anchor type constants
@@ -214,6 +217,16 @@ class MarkupProcessor:
             start = self._utf16_to_python_pos(markup.get("start", 0))
             end = self._utf16_to_python_pos(markup.get("end", 0))
 
+            # Clamp to text bounds and drop degenerate ranges. Highlight offsets
+            # come from a separate source and can overflow the paragraph; the
+            # utf16 converter only clamps on its fast path, so guard here too
+            # (parity with the Rust core). Applies to all markups defensively.
+            text_len = len(self._text)
+            start = max(0, min(start, text_len))
+            end = max(0, min(end, text_len))
+            if start >= end:
+                continue
+
             # Trim leading/trailing whitespace from bold, italic, and code spans
             # This prevents invalid markdown like **text ** from being generated
             if markup_type in (MarkupType.STRONG, MarkupType.EM, MarkupType.CODE):
@@ -257,6 +270,17 @@ class MarkupProcessor:
                     url = f"https://medium.com/u/{user_id}"
                     span = MarkupSpan(start, end, "[", f"]({url})")
                     markup_ranges.append((start, end, markup_type_str, span))
+            elif markup_type == MarkupType.HIGHLIGHT:
+                # Raw-HTML <mark> wrapper (frontend allowlists <mark> in sanitize).
+                # No priority filtering below — a highlight may overlap any other
+                # markup; _split_overlapping nests them.
+                span = MarkupSpan(
+                    start,
+                    end,
+                    '<mark class="bg-emerald-300 dark:bg-emerald-700 dark:text-white">',
+                    "</mark>",
+                )
+                markup_ranges.append((start, end, markup_type_str, span))
 
         # Second pass: handle overlapping markup priorities
         # Priority order: LINK > CODE > EM/STRONG
@@ -338,8 +362,8 @@ class MarkupProcessor:
     def render(self) -> str:
         """Render the text with all markups applied."""
         if _RUST_AVAILABLE:
-            # Hot path: Rust implementation. Byte-for-byte parity with
-            # the Python path on all cases the test suite covers.
+            # Hot path: Rust implementation. Handles HIGHLIGHT too (parity with
+            # the Python path below).
             return _rust_core.process_markups(
                 self._text,
                 self._raw_markups,
@@ -392,7 +416,7 @@ class MediumMarkdownRenderer:
     code blocks, quotes, images, and embeds.
     """
 
-    __slots__ = ("_post_data", "_paragraphs", "_output", "_metadata", "_pos", "_api_service", "_use_base64_images")
+    __slots__ = ("_post_data", "_paragraphs", "_output", "_metadata", "_pos", "_api_service", "_use_base64_images", "_highlights_by_para")
 
     def __init__(
         self,
@@ -415,6 +439,26 @@ class MediumMarkdownRenderer:
             ]
         else:
             self._paragraphs = []
+
+        # Medium "highlights" live in a separate `highlights` array (Quote
+        # objects with UTF-16 startOffset/endOffset + the paragraph(s) they
+        # span), NOT in paragraph markups. Build a map name -> [(start, end)]
+        # so each paragraph can inject synthetic HIGHLIGHT markups at render.
+        # Multi-paragraph highlight: startOffset on the first paragraph,
+        # endOffset on the last, full coverage in between.
+        self._highlights_by_para: dict[str, list[tuple[int, int | None]]] = {}
+        _raw_highlights = post_data.highlights
+        for hl in (_raw_highlights if isinstance(_raw_highlights, list) else []):
+            hl_paras = hl.get("paragraphs") or []
+            names = [hp.get("name") for hp in hl_paras]
+            so = hl.get("startOffset") or 0
+            eo = hl.get("endOffset")
+            for name in names:
+                if not name:
+                    continue
+                start = so if name == names[0] else 0
+                end = eo if name == names[-1] else None  # None -> end of text
+                self._highlights_by_para.setdefault(name, []).append((start, end))
 
     def _escape_html_attribute(self, text: str) -> str:
         """Escape text for use in HTML attributes to prevent XSS.
@@ -701,16 +745,38 @@ class MediumMarkdownRenderer:
         # Normalize smart quotes after markup processing to avoid position misalignment
         return _normalize_quotes(result)
 
+    def _markups_with_highlights(self, paragraph: ParagraphDict) -> list[MarkupDict]:
+        """Return the paragraph's markups plus any synthetic HIGHLIGHT markups
+        from the post's highlights array. Offsets are clamped to the paragraph's
+        UTF-16 length; invalid/empty ranges are dropped."""
+        markups = list(paragraph.get("markups") or [])
+        ranges = self._highlights_by_para.get(paragraph.get("name") or "")
+        if not ranges:
+            return markups
+        text = paragraph.get("text") or ""
+        utf16_len = len(text.encode("utf-16-le")) // 2
+        for start, end in ranges:
+            s = max(0, min(start or 0, utf16_len))
+            e = utf16_len if end is None else max(0, min(end, utf16_len))
+            if s >= e:
+                continue
+            markups.append({"type": MarkupType.HIGHLIGHT, "start": s, "end": e})
+        return markups
+
     def _render_header(self, paragraph: ParagraphDict, level: int) -> None:
         """Render H2/H3/H4 headers."""
-        text = self._render_text(paragraph.get("text"), paragraph.get("markups", []))
+        text = self._render_text(
+            paragraph.get("text"), self._markups_with_highlights(paragraph)
+        )
         prefix = "#" * level
         self._output.append(f"{prefix} {text}")
         self._output.append("")
 
     def _render_paragraph(self, paragraph: ParagraphDict) -> None:
         """Render a regular paragraph."""
-        text = self._render_text(paragraph.get("text"), paragraph.get("markups", []))
+        text = self._render_text(
+            paragraph.get("text"), self._markups_with_highlights(paragraph)
+        )
         self._output.append(text)
         self._output.append("")
 

@@ -5,10 +5,24 @@ global:
 scrape_configs:
   - job_name: freedium-backend
     metrics_path: /metrics
-    static_configs:
-      - targets: ["backend:7080"]
-        labels:
-          service: backend
+    # backend runs as N replicas (no fixed DNS name → a static target would
+    # scrape only one via DNS round-robin and undercount domain metrics).
+    # Discover every backend container via the Docker API and scrape each on
+    # 7080.
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        port: 7080
+    relabel_configs:
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        regex: backend
+        action: keep
+      - source_labels: [__meta_docker_network_ip]
+        target_label: __address__
+        replacement: "${1}:7080"
+      - target_label: service
+        replacement: backend
+      - source_labels: [__meta_docker_container_name]
+        target_label: instance
 
   - job_name: freedium-web
     metrics_path: /metrics

@@ -41,7 +41,8 @@ http:
       priority: 100
       entryPoints:
         - web
-      service: backend
+      # backend now defined by the Docker provider (2 replicas, health-gated).
+      service: backend@docker
 
     web:
       rule: "Host(`freedium.localhost`) || Host(`freedium-mirror.cfd`)"
@@ -80,10 +81,9 @@ http:
         servers:
           - url: "http://web:3000"
 
-    backend:
-      loadBalancer:
-        servers:
-          - url: "http://backend:7080"
+    # backend service is provided by the Docker provider (labels on the
+    # backend service) so it load-balances across both replicas with a
+    # /healthz check. No static file-provider definition.
 
     grafana:
       loadBalancer:

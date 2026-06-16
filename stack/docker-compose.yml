@@ -52,7 +52,13 @@ services:
     build:
       context: ..
       dockerfile: freedium-library/Dockerfile
-    container_name: freedium-backend
+    # No container_name: runs as 2 replicas behind Traefik (rolling, zero-
+    # downtime deploys; one replica can die without an outage). 2 uvicorn
+    # workers each → ~same total worker count as the old single ×4, but split
+    # across replicas so a recreate never drops all of them.
+    command: ["uvicorn", "freedium_library.api.app:app", "--host", "0.0.0.0", "--port", "7080", "--workers", "2", "--log-level", "warning"]
+    deploy:
+      replicas: 2
     environment:
       - ERROR_LOG_PATH=/var/log/freedium/errored-links.jsonl
       - PDF_INTERNAL_SECRET=${PDF_INTERNAL_SECRET:-dev-secret-change-me}
@@ -78,6 +84,16 @@ services:
     networks:
       - freedium_obs_net
     restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=freedium-obs_freedium_obs_net
+      - traefik.http.services.backend.loadbalancer.server.port=7080
+      - traefik.http.services.backend.loadbalancer.healthcheck.path=/healthz
+      - traefik.http.services.backend.loadbalancer.healthcheck.interval=10s
+      # Internal API entrypoint (web → here). Matches everything; not public.
+      - traefik.http.routers.backend-api.entrypoints=backendapi
+      - traefik.http.routers.backend-api.rule=PathPrefix(`/`)
+      - traefik.http.routers.backend-api.service=backend
 
   mongo:
     image: mongo:7
@@ -113,8 +129,17 @@ services:
       # networks outside 172.16/12) MUST pin EDGE_PROXY_CIDR explicitly.
       - "--entrypoints.web.forwardedHeaders.trustedIPs=${EDGE_PROXY_CIDR:-127.0.0.1/32,146.103.108.112/32,172.16.0.0/12}"
       - "--entrypoints.metrics.address=:8082"
+      # Internal-only entrypoint for web → backend API. Not published to the
+      # host, so it's reachable only on the container network (edge HAProxy
+      # never forwards here). web uses http://traefik:7090.
+      - "--entrypoints.backendapi.address=:7090"
       - "--providers.file.filename=/etc/traefik/dynamic.yml"
       - "--providers.file.watch=true"
+      # Docker provider: discovers backend replicas (labels) for health-gated
+      # load balancing. opt-in (exposedByDefault=false) so only labelled
+      # services are routed.
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
       - "--metrics.prometheus=true"
       - "--metrics.prometheus.entryPoint=metrics"
       - "--accesslog=true"
@@ -126,6 +151,7 @@ services:
       - "${WEB_INGRESS_PORT:-18080}:80"
     volumes:
       - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - freedium_obs_net
     restart: unless-stopped
@@ -210,14 +236,20 @@ services:
     deploy:
       replicas: 3
     environment:
-      - PUBLIC_API_BASE_URL=http://backend:7080
-      - PUBLIC_API_URL=http://backend:7080/api
+      # API via Traefik internal entrypoint (:7090), NOT backend directly.
+      # Traefik load-balances + health-checks the 2 backend replicas, and web
+      # holds keep-alive connections to the stable Traefik endpoint — so a
+      # backend recreate (new replica IP) never strands web with dead sockets.
+      - PUBLIC_API_BASE_URL=http://traefik:7090
+      - PUBLIC_API_URL=http://traefik:7090/api
       - PDF_INTERNAL_SECRET=${PDF_INTERNAL_SECRET:-dev-secret-change-me}
-      - PDF_SERVICE_URL=http://backend:7080/api
+      - PDF_SERVICE_URL=http://traefik:7090/api
       - PDF_SERVICE_SECRET=${PDF_INTERNAL_SECRET:-dev-secret-change-me}
     depends_on:
       backend:
         condition: service_healthy
+      traefik:
+        condition: service_started
     networks:
       - freedium_obs_net
     restart: unless-stopped
@@ -250,6 +282,7 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prom_data:/prometheus
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # backend replica discovery
     networks:
       - freedium_obs_net
     restart: unless-stopped

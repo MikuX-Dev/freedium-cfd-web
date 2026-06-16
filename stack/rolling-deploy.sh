@@ -33,43 +33,38 @@ wait_healthy() {  # $1 = name filter, $2 = expected healthy count
   done
 }
 
-if [ "$SVC" = "web" ]; then
-  total=$(docker ps --filter "name=freedium-obs-web" -q | wc -l)
-  [ "$total" -ge 1 ] || total=3
-  echo "==> rolling $total web replicas (one at a time)"
-  for c in $(docker ps --filter "name=freedium-obs-web" -q); do
-    name=$(docker inspect -f '{{.Name}}' "$c" | sed 's#^/##')
-    echo "  -> replacing $name"
-    docker stop "$c" >/dev/null   # graceful SIGTERM; Traefik drops it from rotation
-    docker rm "$c" >/dev/null
-    # Recreate ONLY the now-missing replica, with the freshly-built image.
-    # --no-recreate leaves the still-serving replicas untouched (they keep the
-    # old image until it's their turn), so >=1 replica is always healthy.
-    docker compose up -d --no-deps --no-recreate --scale web="$total" web >/dev/null
-    wait_healthy freedium-obs-web "$total"
-    echo "     OK ($total/$total healthy)"
-  done
-else
-  # Single-container services have no spare replica to roll through, so this
-  # is a normal recreate (brief blip). Run 2+ replicas to make it zero-downtime.
-  echo "==> recreating $SVC"
-  docker compose up -d --no-deps --force-recreate "$SVC"
-
-  # web holds keep-alive connections to backend by container IP. Recreating
-  # backend gives it a NEW IP, leaving web replicas with dead connections
-  # (FetchError "unable to connect" → 500s on the affected replica) until they
-  # reconnect. Roll-restart web one at a time so they re-resolve.
-  if [ "$SVC" = "backend" ]; then
-    echo "==> rolling web to re-resolve backend"
-    for c in $(docker ps --filter "name=freedium-obs-web" --format '{{.Names}}'); do
-      docker restart -t 10 "$c" >/dev/null 2>&1
-      until [ "$(docker inspect -f '{{.State.Health.Status}}' "$c" 2>/dev/null)" = "healthy" ]; do
-        sleep 3
+# web AND backend run as replicas behind Traefik → roll one at a time so a
+# healthy backend always serves. Both have dynamic names freedium-obs-<svc>-N.
+case "$SVC" in
+  web|backend)
+    filt="freedium-obs-$SVC"
+    total=$(docker ps --filter "name=$filt" -q | wc -l)
+    if [ "$total" -lt 1 ]; then
+      # First cutover (e.g. backend migrating off a fixed container_name) or
+      # nothing running yet: plain up to create the replicas, then done.
+      echo "==> $SVC not yet replicated; creating replicas"
+      docker compose up -d --no-deps "$SVC"
+    else
+      echo "==> rolling $total $SVC replicas (one at a time)"
+      for c in $(docker ps --filter "name=$filt" -q); do
+        name=$(docker inspect -f '{{.Name}}' "$c" | sed 's#^/##')
+        echo "  -> replacing $name"
+        docker stop "$c" >/dev/null   # graceful SIGTERM; Traefik health-drops it
+        docker rm "$c" >/dev/null
+        # Recreate ONLY the missing replica with the fresh image; --no-recreate
+        # leaves the still-serving replicas untouched so >=1 is always healthy.
+        docker compose up -d --no-deps --no-recreate --scale "$SVC=$total" "$SVC" >/dev/null
+        wait_healthy "$filt" "$total"
+        echo "     OK ($total/$total healthy)"
       done
-      echo "     re-resolved $c"
-    done
-  fi
-fi
+    fi
+    ;;
+  *)
+    # Truly single-container services (mongo, redis, …): plain recreate.
+    echo "==> recreating $SVC"
+    docker compose up -d --no-deps --force-recreate "$SVC"
+    ;;
+esac
 
 # Reclaim space from the now-superseded image + this build's cache. Every
 # deploy builds a fresh image; without this the dangling layers pile up and

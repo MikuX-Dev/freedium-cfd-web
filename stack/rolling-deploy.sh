@@ -54,6 +54,21 @@ else
   # is a normal recreate (brief blip). Run 2+ replicas to make it zero-downtime.
   echo "==> recreating $SVC"
   docker compose up -d --no-deps --force-recreate "$SVC"
+
+  # web holds keep-alive connections to backend by container IP. Recreating
+  # backend gives it a NEW IP, leaving web replicas with dead connections
+  # (FetchError "unable to connect" → 500s on the affected replica) until they
+  # reconnect. Roll-restart web one at a time so they re-resolve.
+  if [ "$SVC" = "backend" ]; then
+    echo "==> rolling web to re-resolve backend"
+    for c in $(docker ps --filter "name=freedium-obs-web" --format '{{.Names}}'); do
+      docker restart -t 10 "$c" >/dev/null 2>&1
+      until [ "$(docker inspect -f '{{.State.Health.Status}}' "$c" 2>/dev/null)" = "healthy" ]; do
+        sleep 3
+      done
+      echo "     re-resolved $c"
+    done
+  fi
 fi
 
 # Reclaim space from the now-superseded image + this build's cache. Every

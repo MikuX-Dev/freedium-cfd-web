@@ -103,19 +103,25 @@ async def render_article_async(content: str, frontmatter: bool) -> dict:
 
     service_name, resolved_service = await resolver.resolve(content)
 
-    if service_name == "medium":
-        if frontmatter:
-            markdown, _metadata = (
-                await service.arender_with_frontmatter_and_metadata(content)
-            )
+    # Cap concurrent renders in the worker too: a burst of dispatched
+    # render tasks otherwise runs all at once and saturates the CPU. The
+    # semaphore makes excess work queue instead of thrash.
+    from freedium_library.api.render_limit import render_semaphore
+
+    async with render_semaphore:
+        if service_name == "medium":
+            if frontmatter:
+                markdown, _metadata = (
+                    await service.arender_with_frontmatter_and_metadata(content)
+                )
+            else:
+                markdown, _metadata = await service.arender_with_metadata(content)
         else:
-            markdown, _metadata = await service.arender_with_metadata(content)
-    else:
-        markdown = (
-            await resolved_service.arender_with_frontmatter(content)
-            if frontmatter
-            else await resolved_service.arender(content)
-        )
+            markdown = (
+                await resolved_service.arender_with_frontmatter(content)
+                if frontmatter
+                else await resolved_service.arender(content)
+            )
 
     # Write L2 cache in background
     from freedium_library.tasks.cache import write_rendered_cache

@@ -180,9 +180,18 @@ async def render_universal(
         """
 
         async def _wait(coro):
+            # Cap concurrent renders per process. The acquire is inside the
+            # wait_for budget, so when the cap is saturated a contended request
+            # times out and offloads to the worker instead of blocking forever.
+            from freedium_library.api.render_limit import render_semaphore
+
+            async def _guarded():
+                async with render_semaphore:
+                    return await coro
+
             if timeout is None:
-                return await coro
-            return await asyncio.wait_for(coro, timeout=timeout)
+                return await _guarded()
+            return await asyncio.wait_for(_guarded(), timeout=timeout)
 
         # Get resolver from app state
         resolver: ServiceResolver = http_request.app.state.service_resolver
@@ -192,7 +201,9 @@ async def render_universal(
 
         # Render using the resolved service. For Medium, use the *_and_metadata
         # variants so we can populate the recent-posts feed in the same GraphQL
-        # fetch — no extra round-trip just for feed data.
+        # fetch — no extra round-trip just for feed data. The render_semaphore
+        # cap is applied inside _wait (under the INLINE_BUDGET), so a contended
+        # burst offloads to the worker rather than thrashing the CPU.
         if service_name == "medium" and isinstance(service, MediumService):
             if request.frontmatter:
                 markdown, metadata = await _wait(

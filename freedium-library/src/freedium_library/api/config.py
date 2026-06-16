@@ -55,6 +55,18 @@ class ImageProxyConfig(BaseConfig):
     )
 
 
+class RenderConfig(BaseConfig):
+    """Article-render concurrency cap. Bounds simultaneous (CPU-heavy) renders
+    per process so a burst of uncached-article traffic can't saturate the box."""
+
+    model_config = BaseSettingsConfigDict(env_prefix="RENDER_")
+
+    CONCURRENCY: int = Field(
+        default=3,
+        description="Max concurrent renders per process (uvicorn worker / TaskIQ worker).",
+    )
+
+
 class CacheConfig(BaseConfig):
     """Mongo-backed post-cache settings.
 

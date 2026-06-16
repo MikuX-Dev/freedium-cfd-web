@@ -65,7 +65,7 @@ services:
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
       - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
       - IMAGE_SERVE_MODE=redirect
-      - TRACEMALLOC=${TRACEMALLOC:-1}
+      - TRACEMALLOC=${TRACEMALLOC:-0}
     volumes:
       - errored_logs:/var/log/freedium
     depends_on:

@@ -313,9 +313,11 @@ class TestMediumMarkdownRendererParagraphs:
         post_data = self._create_mock_post_data(paragraphs)
         renderer = MediumMarkdownRenderer(post_data, None)
         result = await renderer.render()
-        assert "![Alt text]" in result
+        # Images render as a responsive <picture> element with the caption in
+        # data-caption (consumed by the client lightbox), not as markdown.
+        assert "<picture" in result
         assert "image123" in result
-        assert "*Image caption*" in result
+        assert 'data-caption="Image caption"' in result
 
     @pytest.mark.asyncio
     async def test_iframe_with_source(self) -> None:
@@ -439,7 +441,7 @@ class TestMediumMarkdownRendererMetadata:
         # Collection
         mock_post_data.collection = None
 
-        renderer = MediumMarkdownRenderer(mock_post_data)  # type: ignore[arg-type]
+        renderer = MediumMarkdownRenderer(mock_post_data, None)  # type: ignore[arg-type]
         metadata = renderer.metadata
 
         assert metadata.post_id == "post123"
@@ -504,15 +506,15 @@ class TestMediumMarkdownRendererTableOfContents:
         # Check that table_of_contents is in frontmatter
         assert "table_of_contents:" in result
 
-        # Check expected entries are present (as plain text, not markdown links)
-        assert '"title": "Introduction"' in result
-        assert '"title": "Getting Started"' in result
-        assert '"title": "Conclusion"' in result
+        # Check expected entries are present (YAML frontmatter, plain text)
+        assert "title: Introduction" in result
+        assert "title: Getting Started" in result
+        assert "title: Conclusion" in result
 
         # Check IDs are slugified
-        assert '"id": "introduction"' in result
-        assert '"id": "getting-started"' in result
-        assert '"id": "conclusion"' in result
+        assert "id: introduction" in result
+        assert "id: getting-started" in result
+        assert "id: conclusion" in result
 
     @pytest.mark.asyncio
     async def test_extract_toc_with_markdown_links(self) -> None:
@@ -539,7 +541,7 @@ class TestMediumMarkdownRendererTableOfContents:
         result = await renderer.render_with_frontmatter()
 
         # The TOC should have plain text (not markdown syntax)
-        assert '"title": "Check out the nginx cache guide"' in result
+        assert "title: Check out the nginx cache guide" in result
         # The markdown content should still have the link
         assert "[nginx cache guide]" in result
 
@@ -556,9 +558,9 @@ class TestMediumMarkdownRendererTableOfContents:
         result = await renderer.render_with_frontmatter()
 
         # H2 should be in TOC
-        assert '"title": "Main Header"' in result
+        assert "title: Main Header" in result
         # H4 should NOT be in TOC
-        assert '"title": "Small Header"' not in result
+        assert "title: Small Header" not in result
 
     @pytest.mark.asyncio
     async def test_empty_toc(self) -> None:

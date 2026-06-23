@@ -2,6 +2,11 @@
   "name": "mdream-svc",
   "private": true,
   "type": "module",
-  "scripts": { "start": "bun run server.ts" },
-  "dependencies": { "mdream": "^1.4.1" }
+  "scripts": {
+    "start": "bun run server.ts"
+  },
+  "dependencies": {
+    "mdream": "^1.4.1",
+    "node-html-parser": "^8.0.3"
+  }
 }

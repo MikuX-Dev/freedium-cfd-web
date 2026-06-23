@@ -143,7 +143,7 @@ ANDROID_DEVICE_POOL: list[dict[str, str]] = [
 #                     NOT needed for article content — paywall is client-side).
 # The public nyt-token is DERIVED from the private key, so only one secret.
 DEFAULT_NYT_TOKEN = ""
-DEFAULT_NYT_S = os.environ.get("NYT_S") or None
+DEFAULT_NYT_S = None  # article content is public (client-side paywall) — no auth
 _NYT_PRIVATE_KEY = None
 try:
     from cryptography.hazmat.primitives.serialization import (

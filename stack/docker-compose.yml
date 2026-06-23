@@ -72,11 +72,12 @@ services:
       - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
       - IMAGE_SERVE_MODE=redirect
       - TRACEMALLOC=${TRACEMALLOC:-0}
+      - MEDIUM_ENABLED=${MEDIUM_ENABLED:-true}
       # NYT (dark by default). Flip NYT_ENABLED=true once smoke-tested.
-      # NYT_SIGNING_KEY/NYT_S live in stack/.env (gitignored), never committed.
+      # NYT_SIGNING_KEY lives in stack/.env (gitignored), never committed.
+      # No NYT-S cookie needed — article content is public (client-side paywall).
       - NYT_ENABLED=${NYT_ENABLED:-false}
       - NYT_SIGNING_KEY=${NYT_SIGNING_KEY:-}
-      - NYT_S=${NYT_S:-}
       - NYT_MDREAM_URL=http://mdream:8085
     volumes:
       - errored_logs:/var/log/freedium

@@ -116,8 +116,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     resolver = ServiceResolver()
 
     # Register services
+    from freedium_library.api.config import MediumConfig
+
     medium_service = medium_container.service()
-    resolver.register("medium", medium_service)
+    if MediumConfig().ENABLED:
+        resolver.register("medium", medium_service)
+        logger.info("Medium service registered")
+    else:
+        logger.info("Medium service disabled (MEDIUM_ENABLED=false)")
 
     # NYT (opt-in). Needs NYT_SIGNING_KEY in env (the RSA signing key, never
     # committed); without it the client can't sign → leave unregistered.

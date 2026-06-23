@@ -67,6 +67,14 @@ class RenderConfig(BaseConfig):
     )
 
 
+class MediumConfig(BaseConfig):
+    """Medium service toggle (on by default — it's the core source)."""
+
+    model_config = BaseSettingsConfigDict(env_prefix="MEDIUM_")
+
+    ENABLED: bool = Field(default=True)
+
+
 class NytConfig(BaseConfig):
     """New York Times service. Disabled by default — flip NYT_ENABLED=true
     once NYT_SIGNING_KEY (env, never committed) is set + smoke-tested.

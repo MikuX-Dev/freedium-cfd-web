@@ -48,16 +48,12 @@ class NytService(BaseService):
         self,
         proxy: str | None = None,
         mdream_url: str = "http://mdream:8085",
-        nyt_s: str | None = None,
     ) -> None:
         self._proxy = proxy
         self._mdream_url = mdream_url.rstrip("/")
+        # No NYT-S cookie: article content is public (paywall is client-side).
         # One client instance (rotates device metadata per request internally).
-        self._client = nyt_client.NYTClient(
-            nyt_s=nyt_s or nyt_client.DEFAULT_NYT_S,
-            proxy=proxy,
-            rotate_devices=True,
-        )
+        self._client = nyt_client.NYTClient(proxy=proxy, rotate_devices=True)
 
     # ── validation ──────────────────────────────────────────────────────────
     def _is_valid(self, path: str) -> bool:

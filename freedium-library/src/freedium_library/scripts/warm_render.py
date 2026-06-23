@@ -54,7 +54,10 @@ async def warm_one(client: httpx.AsyncClient, base: str, url: str, poll_timeout:
         return "notfound"
     if r.status_code >= 400:
         return f"http{r.status_code}"
-    data = r.json()
+    try:
+        data = r.json()
+    except ValueError:
+        return "badjson"
     task_id = data.get("task_id")
     if not task_id:  # synchronous render / cache hit
         return f"ok:{data.get('cache_status', 'sync')}"
@@ -68,7 +71,10 @@ async def warm_one(client: httpx.AsyncClient, base: str, url: str, poll_timeout:
             p = await client.get(f"{base}/render/poll/{task_id}")
         except httpx.HTTPError:
             continue
-        status = p.json().get("status")
+        try:
+            status = p.json().get("status")
+        except ValueError:
+            continue  # poll returned non-JSON (e.g. transient error page) — retry
         if status == "done":
             return "ok:worker"
         if status == "error":
@@ -82,7 +88,12 @@ async def worker(name, queue, client, base, done_f, lock, stats, poll_timeout):
             url = queue.get_nowait()
         except asyncio.QueueEmpty:
             return
-        outcome = await warm_one(client, base, url, poll_timeout)
+        # Never let one URL's unexpected error kill the worker (which would
+        # silently shrink in-flight concurrency to zero and stall the run).
+        try:
+            outcome = await warm_one(client, base, url, poll_timeout)
+        except Exception as e:  # noqa: BLE001
+            outcome = f"err:{type(e).__name__}"
         async with lock:
             done_f.write(url + "\n")
             done_f.flush()

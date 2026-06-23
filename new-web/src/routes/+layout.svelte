@@ -22,6 +22,10 @@
 				onClick: () => window.open('https://discord.gg/dAxCuG9nYM', '_blank')
 			}
 		});
+		toast.info('New York Times support added!', {
+			description: 'Paste any NYT article link to read it paywall-free.',
+			duration: 8000
+		});
 	});
 </script>
 

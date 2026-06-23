@@ -30,10 +30,24 @@ import re
 import signal
 import sys
 import time
+import urllib.parse
 
 import httpx
 
 STOP = False
+
+
+def _looks_renderable(url: str) -> bool:
+    """Cheap pre-check: reject obviously-malformed URLs (empty @handle, no
+    host, non-http) so we never spend a render on a guaranteed 404. Sitemaps
+    contain junk like https://medium.com/@/slug-<id> (no username)."""
+    if "/@/" in url:  # empty username
+        return False
+    try:
+        u = urllib.parse.urlparse(url)
+    except ValueError:
+        return False
+    return u.scheme in ("http", "https") and bool(u.netloc)
 
 
 def _stop(signum, _frame):
@@ -44,6 +58,8 @@ def _stop(signum, _frame):
 
 async def warm_one(client: httpx.AsyncClient, base: str, url: str, poll_timeout: float) -> str:
     """Render one URL to completion. Returns an outcome tag."""
+    if not _looks_renderable(url):
+        return "skip:malformed"
     try:
         r = await client.post(f"{base}/render", json={"content": url, "frontmatter": True})
     except httpx.HTTPError as e:
@@ -94,6 +110,11 @@ async def worker(name, queue, client, base, done_f, lock, stats, poll_timeout):
             outcome = await warm_one(client, base, url, poll_timeout)
         except Exception as e:  # noqa: BLE001
             outcome = f"err:{type(e).__name__}"
+        # Graceful backoff: a render error (rate-limit, WARP soft-block, dead
+        # cluster) gets a short pause so we ease off instead of hammering.
+        # Successes and cheap skips run at full speed.
+        if not outcome.startswith(("ok", "skip", "unsupported", "notfound")):
+            await asyncio.sleep(1.0)
         async with lock:
             done_f.write(url + "\n")
             done_f.flush()

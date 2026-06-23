@@ -16,6 +16,8 @@ def _svc() -> NytService:
     [
         ("https://www.nytimes.com/2026/06/22/us/politics/x.html", True),
         ("https://nytimes.com/2026/06/22/world/y.html", True),
+        # proxy/SvelteKit collapse // → https:/ — must still match
+        ("https:/www.nytimes.com/2026/06/22/us/politics/x.html", True),
         ("http://www.nytimes.com/2026/01/02/foo/bar.html", True),
         ("https://www.nytimes.com/interactive/2026/06/22/x.html", False),
         ("https://www.nytimes.com/live/2026/06/22/x", False),

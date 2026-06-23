@@ -31,6 +31,13 @@ _NYT_ARTICLE_RE = re.compile(
     re.IGNORECASE,
 )
 _STATIC01_RE = re.compile(r"https?://static01\.nyt\.com/", re.IGNORECASE)
+# Proxies/SvelteKit collapse the `//` in /https://nytimes.com/… → `https:/…`.
+# Medium's extractor tolerates it; restore it before matching/fetching.
+_COLLAPSED_SCHEME_RE = re.compile(r"^(https?):/+", re.IGNORECASE)
+
+
+def _normalize_url(path: str) -> str:
+    return _COLLAPSED_SCHEME_RE.sub(r"\1://", path.strip())
 
 # Article __typename values we can render. Others (Video, EmbeddedInteractive)
 # don't have a readable hybridBody → unsupported.
@@ -57,7 +64,7 @@ class NytService(BaseService):
 
     # ── validation ──────────────────────────────────────────────────────────
     def _is_valid(self, path: str) -> bool:
-        return bool(_NYT_ARTICLE_RE.match(path.strip()))
+        return bool(_NYT_ARTICLE_RE.match(_normalize_url(path)))
 
     async def _ais_valid(self, path: str) -> bool:
         return self._is_valid(path)
@@ -68,7 +75,7 @@ class NytService(BaseService):
 
         arender_with_frontmatter() defaults to this, which is what the render
         handler calls for non-medium services."""
-        url = path.strip()
+        url = _normalize_url(path)
         # Blocking client (curl_cffi) — run in a thread so it never stalls the
         # event loop. article_raw carries headline/bylines/date + the body HTML.
         import asyncio

@@ -41,6 +41,7 @@ api = [
     "fastapi[standard]==0.137.1",
     "starlette==1.3.1",
     "prometheus-fastapi-instrumentator==8.0.0",
+    "cryptography>=43",  # NYT request signing (RSA SHA256/PKCS1v15)
 ]
 migrate = [
     "psycopg2-binary>=2.9.9",

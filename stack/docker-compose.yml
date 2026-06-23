@@ -72,6 +72,12 @@ services:
       - PROXY_LIST=${PROXY_LIST:-socks5://haproxy-pb:1080}
       - IMAGE_SERVE_MODE=redirect
       - TRACEMALLOC=${TRACEMALLOC:-0}
+      # NYT (dark by default). Flip NYT_ENABLED=true once smoke-tested.
+      # NYT_SIGNING_KEY/NYT_S live in stack/.env (gitignored), never committed.
+      - NYT_ENABLED=${NYT_ENABLED:-false}
+      - NYT_SIGNING_KEY=${NYT_SIGNING_KEY:-}
+      - NYT_S=${NYT_S:-}
+      - NYT_MDREAM_URL=http://mdream:8085
     volumes:
       - errored_logs:/var/log/freedium
     depends_on:
@@ -253,6 +259,27 @@ services:
     networks:
       - freedium_obs_net
     restart: unless-stopped
+
+  mdream:
+    build:
+      context: ../mdream-svc
+    container_name: freedium-mdream
+    environment:
+      - PORT=8085
+    networks:
+      - freedium_obs_net
+    restart: unless-stopped
+    mem_limit: 256m
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8085/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1

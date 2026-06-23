@@ -67,6 +67,18 @@ class RenderConfig(BaseConfig):
     )
 
 
+class NytConfig(BaseConfig):
+    """New York Times service. Disabled by default — flip NYT_ENABLED=true
+    once NYT_SIGNING_KEY (env, never committed) is set + smoke-tested.
+    Egress uses PROXY_LIST[0] (WARP); content via the reverse-engineered
+    mobile API; HTML→markdown via the mdream sidecar."""
+
+    model_config = BaseSettingsConfigDict(env_prefix="NYT_")
+
+    ENABLED: bool = Field(default=False)
+    MDREAM_URL: str = Field(default="http://mdream:8085")
+
+
 class CacheConfig(BaseConfig):
     """Mongo-backed post-cache settings.
 

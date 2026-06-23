@@ -119,6 +119,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     medium_service = medium_container.service()
     resolver.register("medium", medium_service)
 
+    # NYT (opt-in). Needs NYT_SIGNING_KEY in env (the RSA signing key, never
+    # committed); without it the client can't sign → leave unregistered.
+    from freedium_library.api.config import NytConfig
+
+    _nyt_cfg = NytConfig()
+    if _nyt_cfg.ENABLED:
+        from freedium_library.services.nyt import NytService
+        from freedium_library.services.nyt import client as _nyt_client
+
+        if _nyt_client._NYT_PRIVATE_KEY is not None:
+            _nyt_proxy = (os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None)
+            resolver.register(
+                "nyt", NytService(proxy=_nyt_proxy, mdream_url=_nyt_cfg.MDREAM_URL)
+            )
+            logger.info("NYT service registered (egress via PROXY_LIST[0])")
+        else:
+            logger.warning("NYT_ENABLED but NYT_SIGNING_KEY missing/invalid — NYT not registered")
+
     app.state.service_resolver = resolver
 
     # Wire dependency injection to modules

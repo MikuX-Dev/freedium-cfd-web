@@ -487,10 +487,12 @@ class MediumMarkdownRenderer:
         - 'width': Width for HTML attributes
         - 'height': Height for HTML attributes
         """
+        # Source-prefixed /img path (unified scheme). The legacy /img/{w}/{id}
+        # route still serves older cached markdown.
         urls: dict[str, int | str] = {
-            "medium": f"/img/700/{image_id}",
-            "original": f"/img/2000/{image_id}",
-            "zoom": f"/img/4000/{image_id}",
+            "medium": f"/img/medium/700/{image_id}",
+            "original": f"/img/medium/2000/{image_id}",
+            "zoom": f"/img/medium/4000/{image_id}",
         }
 
         # Store dimensions for HTML attributes (prevent Cumulative Layout Shift)

@@ -25,6 +25,11 @@ _MAX_PARALLEL: Final = 16
 # instead of direct miro.medium.com links. WeasyPrint can't resolve a
 # relative URL, so map it back to the upstream miro CDN URL for fetching.
 _IMG_PROXY_RE: Final = re.compile(r"^/img/(\d+)/(.+)$")
+# Unified source-prefixed proxy forms (see api/handlers/images.py):
+#   /img/medium/{width}/{id}  → miro CDN
+#   /img/nyt/{path}           → static01 NYT CDN
+_IMG_MEDIUM_RE: Final = re.compile(r"^/img/medium/(\d+)/(.+)$")
+_IMG_NYT_RE: Final = re.compile(r"^/img/nyt/(.+)$")
 
 # 1x1 transparent SVG for failed/oversize fetches.
 _PLACEHOLDER_DATA_URI: Final = (
@@ -53,10 +58,13 @@ def fetch_url_for_src(src: str) -> str | None:
     """
     if src.startswith(("http://", "https://")):
         return src
-    m = _IMG_PROXY_RE.match(src)
+    m = _IMG_MEDIUM_RE.match(src) or _IMG_PROXY_RE.match(src)
     if m:
         width, image_id = m.group(1), m.group(2)
         return f"https://miro.medium.com/v2/resize:fit:{width}/{image_id}"
+    n = _IMG_NYT_RE.match(src)
+    if n:
+        return f"https://static01.nyt.com/{n.group(1)}"
     return None
 
 

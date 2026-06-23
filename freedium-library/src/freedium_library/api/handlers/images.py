@@ -103,8 +103,21 @@ def _proxy() -> str | None:
     return first or None
 
 
+# Unified source-prefixed redirect map. Each entry's CDN host is hardcoded
+# (SSRF-safe); the request path is appended verbatim. Used by /img/{source}/.
+_IMG_SOURCES: dict[str, str] = {
+    "medium": "https://miro.medium.com/v2/resize:fit:",  # rest = {width}/{id}
+    "nyt": "https://static01.nyt.com/",                   # rest = {path}
+}
+
+
 def register_images_router(app: FastAPI) -> None:
-    @app.get("/img/{width}/{image_id}", include_in_schema=False)
+    # Legacy numeric route registered FIRST so the bare /img/{width}/{id} form
+    # (baked into millions of cached Medium markdown docs) keeps working. The
+    # {width:int} convertor only matches a numeric first segment, so source-
+    # prefixed paths (/img/medium/…, /img/nyt/…) fall through to the unified
+    # route registered at the end of this function.
+    @app.get("/img/{width:int}/{image_id}", include_in_schema=False)
     async def get_image(width: int, image_id: str, request: Request) -> Response:
         if width not in _ALLOWED_WIDTHS:
             raise HTTPException(status_code=400, detail="unsupported width")
@@ -215,3 +228,18 @@ def register_images_router(app: FastAPI) -> None:
             logger.warning(f"image_cache write failed for {key}: {exc!r}")
 
         return Response(content=data, media_type=content_type, headers=_RESP_HEADERS)
+
+    # Unified source-prefixed redirect — registered AFTER the numeric legacy
+    # route so /img/{width}/{id} keeps matching that. Handles /img/medium/…
+    # (new Medium renders) and /img/nyt/… (NYT CDN). 307 → source CDN host
+    # (hardcoded, SSRF-safe), no-referrer + immutable.
+    @app.get("/img/{source}/{rest:path}", include_in_schema=False)
+    async def get_image_src(source: str, rest: str) -> Response:
+        from fastapi.responses import RedirectResponse
+
+        base = _IMG_SOURCES.get(source)
+        if base is None:
+            raise HTTPException(status_code=404, detail="unknown image source")
+        return RedirectResponse(
+            url=base + rest, status_code=307, headers=_REDIRECT_HEADERS
+        )

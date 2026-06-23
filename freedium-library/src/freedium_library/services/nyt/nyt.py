@@ -95,10 +95,38 @@ class NytService(BaseService):
         if len(markdown) < 200:
             raise NytUnsupportedError("article body did not convert")
 
+        # Body figures are JS-lazy-loaded (no <img>/src in the HTML), so mdream
+        # can't recover them. The lead image IS resolvable from promotionalMedia
+        # → prepend it as the cover so the article isn't imageless.
+        markdown = self._lead_image_md(raw) + markdown
+
         # Proxy NYT CDN images through /img (no-referrer, same as Medium).
         markdown = _STATIC01_RE.sub("/img/nyt/", markdown)
 
         return self._frontmatter(raw, url) + markdown
+
+    @staticmethod
+    def _lead_image_md(raw: dict[str, Any]) -> str:
+        """Markdown for the article's lead image from promotionalMedia crops
+        (the body figures are lazy-loaded and unrecoverable). Picks the widest
+        rendition up to 2048px. Empty string when there's no usable image."""
+        pm = raw.get("promotionalMedia") or {}
+        if pm.get("__typename") != "Image":
+            return ""
+        best_w, best_url = 0, ""
+        for crop in pm.get("crops") or []:
+            for r in crop.get("renditions") or []:
+                url = r.get("url") or ""
+                w = r.get("width") or 0
+                if "static01.nyt.com" in url and best_w < w <= 2048:
+                    best_w, best_url = w, url
+        if not best_url:
+            return ""
+        caption = ""
+        cap = pm.get("caption")
+        if isinstance(cap, dict):
+            caption = cap.get("text") or ""
+        return f"![{caption}]({best_url})\n\n"
 
     async def _html_to_markdown(self, html: str) -> str:
         async with httpx.AsyncClient(timeout=30) as c:

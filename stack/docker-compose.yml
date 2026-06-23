@@ -269,10 +269,10 @@ services:
     networks:
       - freedium_obs_net
     restart: unless-stopped
-    mem_limit: 256m
     deploy:
       resources:
         limits:
+          memory: 256m
           cpus: "0.5"
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://localhost:8085/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]

@@ -99,7 +99,24 @@ async def render_article_async(content: str, frontmatter: bool) -> dict:
     container = MediumContainer()
     service = container.service()
     resolver = ServiceResolver()
-    resolver.register("medium", service)
+
+    from freedium_library.api.config import MediumConfig, NytConfig
+
+    if MediumConfig().ENABLED:
+        resolver.register("medium", service)
+
+    # The worker handles cold renders too, so it must resolve the same services
+    # the inline backend does (else a cold NYT render fails with "no service").
+    _nyt_cfg = NytConfig()
+    if _nyt_cfg.ENABLED:
+        import os
+
+        from freedium_library.services.nyt import NytService
+        from freedium_library.services.nyt import client as _nyt_client
+
+        if _nyt_client._NYT_PRIVATE_KEY is not None:
+            _proxy = os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None
+            resolver.register("nyt", NytService(proxy=_proxy, mdream_url=_nyt_cfg.MDREAM_URL))
 
     service_name, resolved_service = await resolver.resolve(content)
 

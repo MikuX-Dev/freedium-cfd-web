@@ -20,6 +20,10 @@
     }
 }
 @page cover, @page :first {
+    /* Set the margin explicitly — the named page does not inherit the base
+       @page margin symmetrically in WeasyPrint (right margin came out 0, so
+       all cover content overflowed the right edge). */
+    margin: 2cm;
     @top-center { content: none; }
     @bottom-left { content: none; }
     @bottom-right { content: none; }

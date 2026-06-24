@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-import httpx
+# import httpx  # only needed for the (disabled) mdream HTML→markdown fallback
 from loguru import logger
 
 from freedium_library.services.base import BaseService
@@ -81,33 +81,102 @@ class NytService(BaseService):
         handler calls for non-medium services."""
         url = _normalize_url(path)
         # Blocking client (curl_cffi) — run in a thread so it never stalls the
-        # event loop. article_raw carries headline/bylines/date + the body HTML.
+        # loop. article_structured returns TYPED body blocks (paragraphs,
+        # headings, ImageBlocks with full crop URLs) — so inline images resolve
+        # server-side (the hybridBody HTML lazy-loads them with no URLs).
         import asyncio
 
-        raw = await asyncio.to_thread(self._client.article_raw, url)
+        raw = await asyncio.to_thread(self._client.article_structured, url)
         if not raw:
             raise NytUnsupportedError("empty NYT response")
         typename = raw.get("__typename")
         if typename not in _RENDERABLE_TYPES:
             raise NytUnsupportedError(f"unsupported NYT type: {typename}")
 
-        html = (raw.get("hybridBody") or {}).get("main", {}).get("contents") or ""
-        if len(html) < 500:
-            raise NytUnsupportedError("no article body in NYT response")
+        blocks = ((raw.get("body") or {}).get("content")) or []
+        body_md = self._blocks_to_markdown(blocks)
+        if len(body_md) < 50:
+            raise NytUnsupportedError("no renderable body blocks")
 
-        markdown = await self._html_to_markdown(html)
-        if len(markdown) < 200:
-            raise NytUnsupportedError("article body did not convert")
-
-        # Body figures are JS-lazy-loaded (no <img>/src in the HTML), so mdream
-        # can't recover them. The lead image IS resolvable from promotionalMedia
-        # → prepend it as the cover so the article isn't imageless.
-        markdown = self._lead_image_md(raw) + markdown
+        # Lead (cover) image from promotionalMedia + the inline body markdown.
+        markdown = self._lead_image_md(raw) + body_md
 
         # Proxy NYT CDN images through /img (no-referrer, same as Medium).
         markdown = _STATIC01_RE.sub("/img/nyt/", markdown)
 
         return self._frontmatter(raw, url) + markdown
+
+    @classmethod
+    def _blocks_to_markdown(cls, blocks: list[dict[str, Any]]) -> str:
+        """Render NYT typed body blocks → markdown. Unknown blocks are skipped."""
+        out: list[str] = []
+        for b in blocks:
+            t = b.get("__typename")
+            if t == "ParagraphBlock":
+                text = cls._inline_md(b.get("content") or [])
+                if text.strip():
+                    out.append(text)
+            elif t == "Heading2Block":
+                text = cls._inline_md(b.get("content") or [])
+                if text.strip():
+                    out.append(f"## {text}")
+            elif t == "ImageBlock":
+                img = cls._image_block_md(b)
+                if img:
+                    out.append(img)
+            # HeaderBasicBlock (headline/byline → frontmatter), InteractiveBlock,
+            # unknown → skipped.
+        return "\n\n".join(out)
+
+    @staticmethod
+    def _inline_md(inlines: list[dict[str, Any]]) -> str:
+        """Concatenate TextInline runs, applying link/bold/italic formats."""
+        parts: list[str] = []
+        for node in inlines:
+            if node.get("__typename") == "LineBreakInline":
+                parts.append("\n")
+                continue
+            text = node.get("text")
+            if not text:
+                continue
+            href = None
+            bold = italic = False
+            for fmt in node.get("formats") or []:
+                ft = fmt.get("__typename") or ""
+                if ft == "LinkFormat":
+                    href = fmt.get("url")
+                elif "Bold" in ft or "Strong" in ft:
+                    bold = True
+                elif "Italic" in ft or "Emphasis" in ft:
+                    italic = True
+            if bold:
+                text = f"**{text}**"
+            if italic:
+                text = f"_{text}_"
+            if href:
+                text = f"[{text}]({href})"
+            parts.append(text)
+        return "".join(parts)
+
+    @classmethod
+    def _image_block_md(cls, block: dict[str, Any]) -> str:
+        media = block.get("media") or {}
+        if media.get("__typename") != "Image":
+            return ""
+        best_w, best_url = 0, ""
+        for crop in media.get("crops") or []:
+            for r in crop.get("renditions") or []:
+                u, w = r.get("url") or "", r.get("width") or 0
+                if "static01.nyt.com" in u and best_w < w <= 2048:
+                    best_w, best_url = w, u
+        if not best_url:
+            return ""
+        cap = (media.get("caption") or {}).get("text") or ""
+        credit = media.get("credit") or ""
+        alt = cap or "image"
+        md = f"![{alt}]({best_url})"
+        tail = " — ".join(p for p in (cap, credit) if p)
+        return f"{md}\n\n*{tail}*" if tail else md
 
     @staticmethod
     def _lead_image_md(raw: dict[str, Any]) -> str:
@@ -132,15 +201,19 @@ class NytService(BaseService):
             caption = cap.get("text") or ""
         return f"![{caption}]({best_url})\n\n"
 
-    async def _html_to_markdown(self, html: str) -> str:
-        async with httpx.AsyncClient(timeout=30) as c:
-            resp = await c.post(
-                self._mdream_url + "/",
-                content=html.encode("utf-8"),
-                headers={"content-type": "text/html"},
-            )
-            resp.raise_for_status()
-            return resp.text
+    # Legacy path: convert hybridBody HTML → markdown via the mdream sidecar.
+    # Superseded by the structured-body renderer (which recovers inline image
+    # URLs the lazy HTML lacks). Kept (disabled) as a fallback option.
+    # async def _html_to_markdown(self, html: str) -> str:
+    #     import httpx
+    #     async with httpx.AsyncClient(timeout=30) as c:
+    #         resp = await c.post(
+    #             self._mdream_url + "/",
+    #             content=html.encode("utf-8"),
+    #             headers={"content-type": "text/html"},
+    #         )
+    #         resp.raise_for_status()
+    #         return resp.text
 
     @staticmethod
     def _frontmatter(raw: dict[str, Any], url: str) -> str:

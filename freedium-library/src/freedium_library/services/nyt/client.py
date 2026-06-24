@@ -947,6 +947,52 @@ class NYTClient:
         )
         return data.get("anyWork") or {}
 
+    # Structured-body query (NOT a persisted hash). The server accepts custom
+    # GraphQL (APQ allowlist isn't enforced), so we request the typed body
+    # blocks — which include inline ImageBlocks WITH full crop URLs. The
+    # persisted AnyWork query only returns pre-rendered hybridBody HTML where
+    # inline images are JS-lazy placeholders (no URLs). This is how we get
+    # every body image server-side.
+    _STRUCTURED_QUERY = (
+        "query($id: String!) { anyWork(id: $id) { __typename"
+        " ... on Article {"
+        "   headline { default } summary"
+        "   bylines { renderedRepresentation }"
+        "   section { displayName }"
+        "   lastMajorModification"
+        "   promotionalMedia { __typename ... on Image { caption { text } crops { renditions { url width } } } }"
+        "   body { content {"
+        "     __typename"
+        "     ... on ParagraphBlock { content { __typename ... on TextInline { text formats { __typename ... on LinkFormat { url } } } } }"
+        "     ... on Heading2Block { content { ... on TextInline { text } } }"
+        "     ... on ImageBlock { media { __typename ... on Image { caption { text } credit crops { renditions { url width } } } } }"
+        "   } }"
+        " } } }"
+    )
+
+    def article_structured(self, uri: str) -> dict:
+        """Fetch the article via a custom GraphQL query that returns the typed
+        body blocks (paragraphs, headings, ImageBlocks with full crop URLs) —
+        unlike the persisted AnyWork query whose hybridBody HTML lazy-loads
+        inline images. Returns the ``anyWork`` Article object (or {})."""
+        nyt_uri = self._normalize_uri(uri)
+        ts, sig = _generate_signature(GQL_ENDPOINT)
+        headers = {
+            **self._device_headers(),
+            "nyt-timestamp": ts,
+            "nyt-signature": sig,
+            "content-type": "application/json",
+        }
+        resp = self._session.post(
+            GQL_ENDPOINT,
+            json={"query": self._STRUCTURED_QUERY, "variables": {"id": nyt_uri}},
+            headers=headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return (data.get("data") or {}).get("anyWork") or {}
+
     def article_html(self, uri: str) -> str:
         """
         Return the raw HTML of an article (hybridBody.main.contents).

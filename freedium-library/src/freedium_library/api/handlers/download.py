@@ -4,8 +4,10 @@ Transport-only handler. The render → inline-images → resolve-gists → assem
 domain lives in MarkdownExportService (services/medium/markdown_export.py).
 """
 
+import re
+
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 from loguru import logger
 
@@ -24,16 +26,43 @@ async def _export(
     return await export.to_markdown(url)
 
 
+def _filename_from_url(url: str) -> str:
+    """Derive a .md filename from a URL's last path segment."""
+    slug = re.sub(r"\.html?$", "", url.rstrip("/").split("/")[-1].split("?")[0])
+    slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", slug).strip("-") or "article"
+    return f"{slug}.md"
+
+
 def register_download_router(router: APIRouter) -> None:
     download_router = APIRouter(prefix="/articles")
 
     async def download_article(
+        request: Request,
         url: str = Query(
-            ..., description="Medium article URL or path to render and download."
+            ..., description="Article URL or path to render and download."
         ),
     ) -> Response:
         try:
-            doc = await _export(url)
+            # Resolve the service so non-Medium sources (NYT, …) download too.
+            # Medium keeps its rich export (inline images + gist resolution);
+            # other services use their standard frontmatter render.
+            resolver = getattr(request.app.state, "service_resolver", None)
+            service_name = None
+            if resolver is not None:
+                try:
+                    service_name, service = await resolver.resolve(url)
+                except Exception:  # noqa: BLE001 — fall back to medium export
+                    service_name = None
+
+            if service_name and service_name != "medium":
+                markdown = await service.arender_with_frontmatter(url)
+                doc = ExportDocument(
+                    content=markdown,
+                    filename=_filename_from_url(url),
+                    media_type="text/markdown; charset=utf-8",
+                )
+            else:
+                doc = await _export(url)
         except HTTPException:
             raise
         except Exception as exc:  # noqa: BLE001 — boundary handler

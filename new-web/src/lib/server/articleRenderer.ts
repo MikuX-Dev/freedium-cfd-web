@@ -449,6 +449,7 @@ export interface ArticleMetadata {
 	subtitle?: string;
 	authors: { name: string; avatar: string; bio?: string }[];
 	readingTime: string;
+	bylineBio?: string;
 	date: string;
 	publishedAt: string | null;
 	updatedAt: string | null;
@@ -579,6 +580,7 @@ export async function renderArticle(
 			subtitle: metadata.subtitle || undefined,
 			authors,
 			readingTime,
+			bylineBio: metadata.byline_bio || undefined,
 			date: metadata.first_published_at
 				? new Date(metadata.first_published_at).toISOString()
 				: new Date().toISOString(),
@@ -657,13 +659,13 @@ export async function renderArticle(
 			.trim();
 	}
 
-	// Author bios are raw HTML (NYT Person.description, full profile). Run them
-	// through the SAME rehype-raw + sanitize pipeline so links/headings survive
-	// but unsafe markup is stripped; the client renders the result with {@html}.
-	if (article?.authors) {
-		for (const a of article.authors) {
-			if (a.bio) a.bio = String(await processor.process(a.bio)).trim();
-		}
+	// Byline bio is raw HTML (NYT #enhanced-byline: short per-article author bios
+	// + datelines). Sanitize through the same pipeline; client renders it {@html}.
+	if (article?.bylineBio) {
+		article.bylineBio = String(await processor.process(article.bylineBio))
+			.trim()
+			.replace(/^<p>([\s\S]*)<\/p>$/, "$1")
+			.trim();
 	}
 
 	// Render body-image caption markdown → HTML server-side (same pipeline as

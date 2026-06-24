@@ -960,6 +960,9 @@ class NYTClient:
         "   bylines { renderedRepresentation creators { __typename ... on Person { displayName description promotionalMedia { __typename ... on Image { crops { renditions { url width } } } } } } }"
         "   section { displayName }"
         "   lastMajorModification"
+        # hybridBody carries the rendered #enhanced-byline (short per-article
+        # author bio + datelines) — not present as a structured field/block.
+        "   hybridBody { main { contents } }"
         "   promotionalMedia { __typename ... on Image { caption { text } crops { renditions { url width } } } }"
         "   body { content {"
         "     __typename"

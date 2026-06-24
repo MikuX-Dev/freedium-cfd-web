@@ -224,13 +224,11 @@
 								{#if article.readingTime}
 								<p class="text-gray-600 dark:text-gray-400">{article.readingTime}</p>
 							{/if}
-								{#each authors as a (a.name)}
-									{#if a.bio}
-										<div class="author-bio mt-1 text-sm text-gray-500 dark:text-gray-400">
-											{@html a.bio}
-										</div>
-									{/if}
-								{/each}
+								{#if article.bylineBio}
+									<div class="author-bio mt-1 text-sm text-gray-500 dark:text-gray-400">
+										{@html article.bylineBio}
+									</div>
+								{/if}
 							</div>
 						</div>
 					</header>

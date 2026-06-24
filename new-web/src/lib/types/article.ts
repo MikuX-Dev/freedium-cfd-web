@@ -33,6 +33,7 @@ export interface Article {
 	postImageCaption?: string;
 	authors: Author[];
 	readingTime?: string;
+	bylineBio?: string;
 	tableOfContents?: TableOfContentsItem[];
 }
 

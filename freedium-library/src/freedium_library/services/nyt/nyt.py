@@ -35,6 +35,11 @@ _NYT_ARTICLE_RE = re.compile(
     re.IGNORECASE,
 )
 _STATIC01_RE = re.compile(r"https?://static01\.nyt\.com/", re.IGNORECASE)
+# Short per-article author bio + datelines, rendered in hybridBody only
+# ("<author> covers <beat>. He/She reported from <city>." for each author).
+_ENHANCED_BYLINE_RE = re.compile(
+    r'id="enhanced-byline"[^>]*>\s*<p[^>]*>(.*?)</p>', re.S | re.IGNORECASE
+)
 # Proxies/SvelteKit collapse the `//` in /https://nytimes.com/… → `https:/…`.
 # Medium's extractor tolerates it; restore it before matching/fetching.
 _COLLAPSED_SCHEME_RE = re.compile(r"^(https?):/+", re.IGNORECASE)
@@ -260,8 +265,6 @@ class NytService(BaseService):
                 )
                 if avatar:
                     entry["avatar"] = avatar
-                if p.get("description"):
-                    entry["bio"] = p["description"]  # full profile HTML, sanitized client-side
                 authors.append(entry)
         if not authors:  # fallback to the rendered byline string
             rep = ""
@@ -279,6 +282,14 @@ class NytService(BaseService):
             "is_locked": False,
             "url": url,
         }
+        # Short per-article byline bio + datelines (hybridBody #enhanced-byline).
+        hybrid = (raw.get("hybridBody") or {}).get("main", {}).get("contents") or ""
+        bm = _ENHANCED_BYLINE_RE.search(hybrid)
+        if bm:
+            bio = bm.group(1).strip()
+            if bio:
+                meta["byline_bio"] = bio
+
         if raw.get("summary"):
             meta["subtitle"] = raw["summary"]
         if date:

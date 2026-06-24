@@ -45,24 +45,17 @@ def register_download_router(router: APIRouter) -> None:
         try:
             # Resolve the service so non-Medium sources (NYT, …) download too.
             # Medium keeps its rich export (inline images + gist resolution);
-            # other services use their standard frontmatter render.
-            resolver = getattr(request.app.state, "service_resolver", None)
-            service_name = None
-            if resolver is not None:
-                try:
-                    service_name, service = await resolver.resolve(url)
-                except Exception:  # noqa: BLE001 — fall back to medium export
-                    service_name = None
-
-            if service_name and service_name != "medium":
+            # other services (NYT) use their standard frontmatter render.
+            service_name, service = await request.app.state.service_resolver.resolve(url)
+            if service_name == "medium":
+                doc = await _export(url)
+            else:
                 markdown = await service.arender_with_frontmatter(url)
                 doc = ExportDocument(
                     content=markdown,
                     filename=_filename_from_url(url),
                     media_type="text/markdown; charset=utf-8",
                 )
-            else:
-                doc = await _export(url)
         except HTTPException:
             raise
         except Exception as exc:  # noqa: BLE001 — boundary handler

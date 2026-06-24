@@ -64,7 +64,11 @@ const FREEDIUM_SANITIZE_SCHEMA: typeof defaultSchema = (() => {
 	const s = structuredClone(defaultSchema);
 	// "mark" = Medium highlights (<mark class="bg-emerald-...">); not in the
 	// default schema, so without this the highlight wrapper is stripped.
-	s.tagNames = [...new Set([...(s.tagNames ?? []), "iframe", "mark"])];
+	// figure/figcaption: NYT image blocks + grids/diptychs wrap images in
+	// <figure class="image-grid">…<figcaption>. Not in the default allowlist,
+	// so without this sanitize unwraps them → images spill out loose + the
+	// grid layout breaks.
+	s.tagNames = [...new Set([...(s.tagNames ?? []), "iframe", "mark", "figure", "figcaption"])];
 	s.attributes = {
 		...s.attributes,
 		// Note: id/style intentionally NOT wildcard-allowed (DOM-clobbering /

@@ -261,7 +261,7 @@ class NytService(BaseService):
                 if avatar:
                     entry["avatar"] = avatar
                 if p.get("description"):
-                    entry["bio"] = p["description"]
+                    entry["bio"] = p["description"]  # full profile HTML, sanitized client-side
                 authors.append(entry)
         if not authors:  # fallback to the rendered byline string
             rep = ""

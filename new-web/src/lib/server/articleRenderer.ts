@@ -657,6 +657,15 @@ export async function renderArticle(
 			.trim();
 	}
 
+	// Author bios are raw HTML (NYT Person.description, full profile). Run them
+	// through the SAME rehype-raw + sanitize pipeline so links/headings survive
+	// but unsafe markup is stripped; the client renders the result with {@html}.
+	if (article?.authors) {
+		for (const a of article.authors) {
+			if (a.bio) a.bio = String(await processor.process(a.bio)).trim();
+		}
+	}
+
 	// Render body-image caption markdown → HTML server-side (same pipeline as
 	// the cover caption above) so the client lightbox just displays it — no
 	// client-side markdown parsing. Captions arrive as data-caption="<md>" on

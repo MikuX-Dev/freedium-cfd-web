@@ -226,7 +226,9 @@
 							{/if}
 								{#each authors as a (a.name)}
 									{#if a.bio}
-										<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{a.bio}</p>
+										<div class="author-bio mt-1 text-sm text-gray-500 dark:text-gray-400">
+											{@html a.bio}
+										</div>
 									{/if}
 								{/each}
 							</div>

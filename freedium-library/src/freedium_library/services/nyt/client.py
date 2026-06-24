@@ -957,7 +957,7 @@ class NYTClient:
         "query($id: String!) { anyWork(id: $id) { __typename"
         " ... on Article {"
         "   headline { default } summary"
-        "   bylines { renderedRepresentation }"
+        "   bylines { renderedRepresentation creators { __typename ... on Person { displayName description promotionalMedia { __typename ... on Image { crops { renditions { url width } } } } } } }"
         "   section { displayName }"
         "   lastMajorModification"
         "   promotionalMedia { __typename ... on Image { caption { text } crops { renditions { url width } } } }"

@@ -27,6 +27,7 @@
 	let { data }: Props = $props();
 
 	let article = $derived(data.article);
+	let authors = $derived(article.authors?.length ? article.authors : [article.author]);
 	let content = $derived(data.content);
 	let loading = $derived(data.loading);
 	let error = $derived(data.error);
@@ -205,11 +206,27 @@
 						{#if article.subtitle}
 							<p class="mb-4 text-xl text-gray-700 dark:text-gray-300">{article.subtitle}</p>
 						{/if}
-						<div class="flex items-center">
-							<img src={article.author.avatar} alt="" class="w-12 h-12 mr-4 rounded-full" />
+						<div class="flex items-start">
+							<!-- avatars: overlapping stack for multiple authors -->
+							<div class="flex mr-4 shrink-0">
+								{#each authors as a, i (a.name + i)}
+									<img
+										src={a.avatar}
+										alt=""
+										class="w-12 h-12 rounded-full border-2 border-gray-50 dark:border-zinc-800 {i > 0 ? '-ml-4' : ''}"
+									/>
+								{/each}
+							</div>
 							<div>
-								<p class="font-semibold text-gray-900 dark:text-white">{article.author.name}</p>
+								<p class="font-semibold text-gray-900 dark:text-white">
+									By {authors.map((a) => a.name).join(' and ')}
+								</p>
 								<p class="text-gray-600 dark:text-gray-400">{article.author.role}</p>
+								{#each authors as a (a.name)}
+									{#if a.bio}
+										<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{a.bio}</p>
+									{/if}
+								{/each}
 							</div>
 						</div>
 					</header>

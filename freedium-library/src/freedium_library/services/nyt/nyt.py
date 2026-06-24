@@ -228,20 +228,38 @@ class NytService(BaseService):
             if isinstance(headline, dict)
             else (headline or "Untitled")
         )
-        # bylines: [{"renderedRepresentation": "By Tyler Pager"}]
-        names = []
+        # bylines[].creators[] = Person {displayName, description (bio),
+        # promotionalMedia (headshot)}. Build a multi-author list with images.
+        authors: list[dict[str, str]] = []
         for b in raw.get("bylines") or []:
-            rep = (b or {}).get("renderedRepresentation", "")
-            if rep:
-                names.append(re.sub(r"^By\s+", "", rep).strip())
-        author_name = ", ".join(names) or "The New York Times"
+            for p in (b or {}).get("creators") or []:
+                if p.get("__typename") != "Person":
+                    continue
+                name = p.get("displayName") or ""
+                if not name:
+                    continue
+                entry: dict[str, str] = {"name": name}
+                avatar, _z = cls._pick_renditions(
+                    (p.get("promotionalMedia") or {}).get("crops") or []
+                )
+                if avatar:
+                    entry["avatar"] = avatar
+                if p.get("description"):
+                    entry["bio"] = p["description"]
+                authors.append(entry)
+        if not authors:  # fallback to the rendered byline string
+            rep = ""
+            for b in raw.get("bylines") or []:
+                rep = (b or {}).get("renderedRepresentation", "") or rep
+            authors = [{"name": re.sub(r"^By\s+", "", rep).strip() or "The New York Times"}]
 
         section = raw.get("section") or {}
         date = raw.get("firstPublishedAt") or raw.get("lastMajorModification") or ""
 
         meta: dict[str, Any] = {
             "title": title,
-            "author": {"name": author_name},
+            "author": {"name": ", ".join(a["name"] for a in authors)},
+            "authors": authors,
             "publication": "The New York Times",
             "is_locked": False,
             "url": url,

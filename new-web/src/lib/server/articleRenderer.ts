@@ -448,6 +448,7 @@ export interface ArticleMetadata {
 	title: string;
 	subtitle?: string;
 	author: { name: string; avatar: string; role: string };
+	authors: { name: string; avatar: string; role: string; bio?: string }[];
 	date: string;
 	publishedAt: string | null;
 	updatedAt: string | null;
@@ -574,10 +575,30 @@ export async function renderArticle(
 			author.role = `${metadata.reading_time} min read`;
 		}
 
+		// Multiple authors (each with name + avatar + optional bio). Falls back
+		// to the single `author` above when the frontmatter has no `authors`.
+		let authors: { name: string; avatar: string; role: string; bio?: string }[] = [author];
+		if (Array.isArray(metadata.authors) && metadata.authors.length > 0) {
+			authors = metadata.authors.map(
+				(a: { name?: string; avatar?: string; bio?: string }) => {
+					const name = a.name || "Unknown";
+					return {
+						name,
+						avatar:
+							a.avatar ||
+							`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
+						role: author.role,
+						bio: a.bio || undefined,
+					};
+				},
+			);
+		}
+
 		article = {
 			title: metadata.title || "Untitled",
 			subtitle: metadata.subtitle || undefined,
 			author,
+			authors,
 			date: metadata.first_published_at
 				? new Date(metadata.first_published_at).toISOString()
 				: new Date().toISOString(),

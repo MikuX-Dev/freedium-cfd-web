@@ -42,7 +42,7 @@ function renderCover(article: ArticleMetadata): string {
     return `
     <section class="cover">
         <div class="cover-content">
-            <img class="cover-image" src="${escapeHtml(article.postImage)}" alt=""/>
+            <div class="cover-image" style="background-image:url('${escapeHtml(article.postImage)}')"></div>
             <h1 class="cover-title">${escapeHtml(article.title)}</h1>
             ${article.subtitle ? `<p class="cover-subtitle">${escapeHtml(article.subtitle)}</p>` : ""}
             <div class="cover-meta">

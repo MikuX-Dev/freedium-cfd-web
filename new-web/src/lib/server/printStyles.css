@@ -28,10 +28,10 @@
    margin), not full-bleed — so it can never overflow the page edge. Image
    and text share the same left edge. */
 .cover { page: cover; page-break-after: always; }
-/* Image lives INSIDE .cover-content (a normal block that respects the page
-   margins). A replaced <img> as a direct child of the page section skips the
-   right margin in WeasyPrint and overflows — nesting it fixes that. */
-.cover-image { display: block; width: 100%; height: auto; border-radius: 4pt; margin-bottom: 0.8cm; }
+/* Cover image as a background on a normal block (NOT a replaced <img>): a
+   replaced <img> overflows the right page margin in WeasyPrint regardless of
+   width/max-width. A div clips its background, so it can never overflow. */
+.cover-image { display: block; width: 100%; height: 9cm; background-size: cover; background-position: center; border-radius: 4pt; margin-bottom: 0.8cm; }
 .cover-content { padding: 1cm 0 0; }
 .cover-title { font: bold 32pt/1.15 Georgia, serif; margin: 0 0 0.5cm; color: #111; }
 .cover-subtitle { font: 16pt/1.3 Georgia, serif; margin: 0 0 1cm; color: #444; }

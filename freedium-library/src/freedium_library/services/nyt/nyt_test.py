@@ -23,7 +23,11 @@ def _svc() -> NytService:
         ("https://www.nytimes.com/live/2026/06/22/x", False),
         ("https://www.nytimes.com/section/world", False),
         ("https://medium.com/@a/post-abc123def456", False),
-        ("https://cooking.nytimes.com/recipes/123", False),
+        # *.nytimes.com subdomains + non-date content paths
+        ("https://cooking.nytimes.com/article/picnic-planning-mistakes", True),
+        ("https://cooking.nytimes.com/recipes/1021234-thing", True),
+        ("https://www.nytimes.com/wirecutter/reviews/best-x/", True),
+        ("https://evil.com/nytimes.com/2026/06/22/x.html", False),
     ],
 )
 def test_is_valid(url: str, expected: bool) -> None:

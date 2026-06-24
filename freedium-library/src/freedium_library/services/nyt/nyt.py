@@ -24,10 +24,14 @@ from freedium_library.services.base import BaseService
 from freedium_library.services.nyt import client as nyt_client
 
 
-# Standard NYT article URL: nytimes.com/YYYY/MM/DD/<section>/<slug>.html
-# Excludes /live/ and /interactive/ (different DOM → handled as unsupported).
+# Any nytimes.com subdomain (www, cooking, …). Content paths: dated articles
+# (/YYYY/MM/DD/…), cooking (/article/, /recipes/), wirecutter. Excludes
+# non-article surfaces (interactive/live/section/video/games) — those fall
+# through to "unsupported" via the __typename gate anyway.
 _NYT_ARTICLE_RE = re.compile(
-    r"^https?://(www\.)?nytimes\.com/\d{4}/\d{2}/\d{2}/(?!interactive/|live/)[^?#]+",
+    r"^https?://([a-z0-9-]+\.)*nytimes\.com/"
+    r"(?!interactive/|live/|section/|column/|by/|video/|spotlight/|games/|crosswords?/)"
+    r"(\d{4}/\d{2}/\d{2}/|article/|recipes?/|wirecutter/)[^?#]+",
     re.IGNORECASE,
 )
 _STATIC01_RE = re.compile(r"https?://static01\.nyt\.com/", re.IGNORECASE)

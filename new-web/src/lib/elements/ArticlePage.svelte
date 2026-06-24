@@ -213,7 +213,7 @@
 									<img
 										src={a.avatar}
 										alt=""
-										class="w-12 h-12 rounded-full border-2 border-gray-50 dark:border-zinc-800 {i > 0 ? '-ml-4' : ''}"
+										class="w-12 h-12 rounded-full object-cover bg-gray-200 dark:bg-zinc-700 border-2 border-gray-50 dark:border-zinc-800 {i > 0 ? '-ml-4' : ''}"
 									/>
 								{/each}
 							</div>

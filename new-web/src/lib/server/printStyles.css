@@ -19,27 +19,19 @@
         color: #888;
     }
 }
-@page cover, @page :first {
-    /* Set the margin explicitly — the named page does not inherit the base
-       @page margin symmetrically in WeasyPrint (right margin came out 0, so
-       all cover content overflowed the right edge). */
-    margin: 2cm;
+/* Only suppress the running header/footer on the first page. Do NOT use a
+   named page (page: cover) — WeasyPrint computed its right margin as 0, so all
+   cover content overflowed the right edge. The default @page margins (proven
+   correct on body pages, 2cm symmetric) apply to the cover too. */
+@page :first {
     @top-center { content: none; }
     @bottom-left { content: none; }
     @bottom-right { content: none; }
 }
-/* Cover image is CONTAINED within the page's content box (the 2cm @page
-   margin), not full-bleed — so it can never overflow the page edge. Image
-   and text share the same left edge. */
-.cover { page: cover; page-break-after: always; }
-/* The cover <img> overflows the right page margin in WeasyPrint (replaced
-   element on a named page). The wrapper div respects the margins; overflow:
-   hidden clips the img to the div's box, so nothing spills past the margin.
-   (Must stay an <img> — the PDF image-inliner only inlines <img src>, not
-   background-image url().) */
+.cover { page-break-after: always; }
 .cover-image-box { width: 100%; height: 9cm; overflow: hidden; border-radius: 4pt; margin-bottom: 0.8cm; }
 .cover-image { display: block; width: 100%; height: auto; }
-.cover-content { padding: 1cm 0 0; }
+.cover-content { padding: 0; }
 .cover-title { font: bold 32pt/1.15 Georgia, serif; margin: 0 0 0.5cm; color: #111; }
 .cover-subtitle { font: 16pt/1.3 Georgia, serif; margin: 0 0 1cm; color: #444; }
 .cover-meta { margin-top: 2cm; font: 11pt 'Helvetica', sans-serif; }

@@ -29,7 +29,14 @@ async def inline_images(html_str: str) -> str:
     """
     if not html_str:
         return html_str
-    tree = lxml_html.fragment_fromstring(html_str, create_parent="div")  # type: ignore[arg-type]
+    # A full document (<!doctype>/<html>) must be parsed as a document so the
+    # <head>/<style> (incl. @page rules) survive — fragment_fromstring drops
+    # everything outside <body>, which silently strips ALL the print CSS.
+    is_full_doc = html_str.lstrip()[:60].lower().startswith(("<!doctype", "<html"))
+    if is_full_doc:
+        tree = lxml_html.document_fromstring(html_str)  # type: ignore[arg-type]
+    else:
+        tree = lxml_html.fragment_fromstring(html_str, create_parent="div")  # type: ignore[arg-type]
 
     # Map each inlinable <img src> to the absolute URL we must fetch.
     # Legacy miro URLs fetch as-is; new /img/{w}/{id} proxy URLs are
@@ -64,6 +71,11 @@ async def inline_images(html_str: str) -> str:
         if src in src_to_fetch:
             img.set("src", fetch_to_data[src_to_fetch[src]])
 
+    if is_full_doc:
+        # Serialize the whole document (<html> with <head>/<style>/@page intact).
+        return lxml_html.tostring(  # type: ignore[return-value]
+            tree, encoding="unicode", doctype="<!DOCTYPE html>"
+        )
     # fragment_fromstring wrapped us in a <div>; serialize children only.
     parts: list[str] = [
         lxml_html.tostring(child, encoding="unicode")  # type: ignore[assignment]

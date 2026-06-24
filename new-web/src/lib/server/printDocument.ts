@@ -41,8 +41,8 @@ function renderCover(article: ArticleMetadata): string {
     const showUpdated = updatedStr !== "" && updatedStr !== publishedStr;
     return `
     <section class="cover">
-        <img class="cover-image" src="${escapeHtml(article.postImage)}" alt=""/>
         <div class="cover-content">
+            <img class="cover-image" src="${escapeHtml(article.postImage)}" alt=""/>
             <h1 class="cover-title">${escapeHtml(article.title)}</h1>
             ${article.subtitle ? `<p class="cover-subtitle">${escapeHtml(article.subtitle)}</p>` : ""}
             <div class="cover-meta">

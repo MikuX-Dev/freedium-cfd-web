@@ -98,13 +98,12 @@ class NytService(BaseService):
         if len(body_md) < 50:
             raise NytUnsupportedError("no renderable body blocks")
 
-        # Lead (cover) image from promotionalMedia + the inline body markdown.
-        markdown = self._lead_image_md(raw) + body_md
-
-        # Proxy NYT CDN images through /img (no-referrer, same as Medium).
-        markdown = _STATIC01_RE.sub("/img/nyt/", markdown)
-
-        return self._frontmatter(raw, url) + markdown
+        # Cover image goes in frontmatter (preview_image) → rendered as the
+        # article header by the frontend, same as Medium. Body images are in
+        # body_md. The final sub rewrites every static01 URL (frontmatter +
+        # body) → /img/nyt (proxied, no-referrer).
+        markdown = self._frontmatter(raw, url) + body_md
+        return _STATIC01_RE.sub("/img/nyt/", markdown)
 
     @classmethod
     def _blocks_to_markdown(cls, blocks: list[dict[str, Any]]) -> str:
@@ -158,48 +157,52 @@ class NytService(BaseService):
             parts.append(text)
         return "".join(parts)
 
+    @staticmethod
+    def _pick_renditions(crops: list[dict[str, Any]]) -> tuple[str, str]:
+        """(display, zoom) URLs from NYT crop renditions. display = widest
+        ≤1100px, zoom = widest ≤2048px. ('', '') when none."""
+        rends = sorted(
+            (
+                (r.get("width") or 0, r.get("url") or "")
+                for crop in crops or []
+                for r in (crop.get("renditions") or [])
+                if "static01.nyt.com" in (r.get("url") or "")
+            ),
+        )
+        if not rends:
+            return "", ""
+        disp = next((u for w, u in reversed(rends) if w <= 1100), rends[0][1])
+        zoom = next((u for w, u in reversed(rends) if w <= 2048), rends[-1][1])
+        return disp, zoom
+
+    @staticmethod
+    def _esc(text: str) -> str:
+        return (
+            text.replace("&", "&amp;").replace('"', "&quot;")
+            .replace("<", "&lt;").replace(">", "&gt;")
+        )
+
     @classmethod
     def _image_block_md(cls, block: dict[str, Any]) -> str:
         media = block.get("media") or {}
         if media.get("__typename") != "Image":
             return ""
-        best_w, best_url = 0, ""
-        for crop in media.get("crops") or []:
-            for r in crop.get("renditions") or []:
-                u, w = r.get("url") or "", r.get("width") or 0
-                if "static01.nyt.com" in u and best_w < w <= 2048:
-                    best_w, best_url = w, u
-        if not best_url:
+        disp, zoom = cls._pick_renditions(media.get("crops") or [])
+        if not disp:
             return ""
         cap = (media.get("caption") or {}).get("text") or ""
         credit = media.get("credit") or ""
-        alt = cap or "image"
-        md = f"![{alt}]({best_url})"
-        tail = " — ".join(p for p in (cap, credit) if p)
-        return f"{md}\n\n*{tail}*" if tail else md
-
-    @staticmethod
-    def _lead_image_md(raw: dict[str, Any]) -> str:
-        """Markdown for the article's lead image from promotionalMedia crops
-        (the body figures are lazy-loaded and unrecoverable). Picks the widest
-        rendition up to 2048px. Empty string when there's no usable image."""
-        pm = raw.get("promotionalMedia") or {}
-        if pm.get("__typename") != "Image":
-            return ""
-        best_w, best_url = 0, ""
-        for crop in pm.get("crops") or []:
-            for r in crop.get("renditions") or []:
-                url = r.get("url") or ""
-                w = r.get("width") or 0
-                if "static01.nyt.com" in url and best_w < w <= 2048:
-                    best_w, best_url = w, url
-        if not best_url:
-            return ""
-        caption = ""
-        cap = pm.get("caption")
-        if isinstance(cap, dict):
-            caption = cap.get("text") or ""
-        return f"![{caption}]({best_url})\n\n"
+        visible = " — ".join(p for p in (cap, credit) if p)
+        # Match Medium's body-image structure: <img> with data-zoom-src +
+        # data-caption (lightbox) inside a <figure> with a visible <figcaption>.
+        # Raw HTML block (blank lines so the markdown pipeline treats it as HTML).
+        cap_attr = f' data-caption="{cls._esc(visible)}"' if visible else ""
+        figcap = f"<figcaption>{cls._esc(visible)}</figcaption>" if visible else ""
+        return (
+            f'\n<figure><img src="{cls._esc(disp)}" alt="{cls._esc(cap or "image")}"'
+            f' loading="lazy" data-zoom-src="{cls._esc(zoom or disp)}"{cap_attr}'
+            f' class="prose-image"/>{figcap}</figure>\n'
+        )
 
     # Legacy path: convert hybridBody HTML → markdown via the mdream sidecar.
     # Superseded by the structured-body renderer (which recovers inline image
@@ -215,8 +218,8 @@ class NytService(BaseService):
     #         resp.raise_for_status()
     #         return resp.text
 
-    @staticmethod
-    def _frontmatter(raw: dict[str, Any], url: str) -> str:
+    @classmethod
+    def _frontmatter(cls, raw: dict[str, Any], url: str) -> str:
         import yaml
 
         headline = raw.get("headline")
@@ -249,6 +252,19 @@ class NytService(BaseService):
             meta["date"] = date
         if isinstance(section, dict) and section.get("displayName"):
             meta["tags"] = [section["displayName"]]
+
+        # Cover image → preview_image{medium,zoom,caption} (frontend renders the
+        # article-header cover from this, same as Medium). static01 URLs are
+        # rewritten to /img/nyt by the caller's final sub.
+        pm = raw.get("promotionalMedia") or {}
+        if pm.get("__typename") == "Image":
+            disp, zoom = cls._pick_renditions(pm.get("crops") or [])
+            if disp:
+                meta["preview_image"] = {
+                    "medium": disp,
+                    "zoom": zoom or disp,
+                    "caption": (pm.get("caption") or {}).get("text") or "",
+                }
 
         return "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + "---\n\n"
 

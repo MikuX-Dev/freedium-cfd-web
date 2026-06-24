@@ -447,8 +447,8 @@ export type RenderMode = "web" | "print";
 export interface ArticleMetadata {
 	title: string;
 	subtitle?: string;
-	author: { name: string; avatar: string; role: string };
-	authors: { name: string; avatar: string; role: string; bio?: string }[];
+	authors: { name: string; avatar: string; bio?: string }[];
+	readingTime: string;
 	date: string;
 	publishedAt: string | null;
 	updatedAt: string | null;
@@ -547,58 +547,38 @@ export async function renderArticle(
 			}
 		}
 
-		// Extract author information - handle both old string format and new object format
-		let author = {
-			name: "Unknown",
-			avatar: `https://ui-avatars.com/api/?name=Unknown&background=random`,
-			role: "Author",
-		};
+		// Canonical author model: a list. `authors` (NYT etc.) is preferred;
+		// a single `author` (Medium, string or object) is normalized into a
+		// one-element list. Reading time is a separate article field.
+		const avatarFor = (name: string, avatar?: string) =>
+			avatar ||
+			`https://ui-avatars.com/api/?name=${encodeURIComponent(name || "Unknown")}&background=random`;
 
-		if (metadata.author) {
-			if (typeof metadata.author === "string") {
-				// Old format: just author name string
-				author.name = metadata.author;
-				author.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(metadata.author)}&background=random`;
-			} else if (typeof metadata.author === "object" && metadata.author.name) {
-				// New format: author object with name and avatar
-				author.name = metadata.author.name;
-				if (metadata.author.avatar) {
-					author.avatar = metadata.author.avatar;
-				} else {
-					author.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(metadata.author.name)}&background=random`;
-				}
-			}
-		}
+		const readingTime = metadata.reading_time ? `${metadata.reading_time} min read` : "";
 
-		// Add reading time as role if available
-		if (metadata.reading_time) {
-			author.role = `${metadata.reading_time} min read`;
-		}
-
-		// Multiple authors (each with name + avatar + optional bio). Falls back
-		// to the single `author` above when the frontmatter has no `authors`.
-		let authors: { name: string; avatar: string; role: string; bio?: string }[] = [author];
+		let authors: { name: string; avatar: string; bio?: string }[];
 		if (Array.isArray(metadata.authors) && metadata.authors.length > 0) {
-			authors = metadata.authors.map(
-				(a: { name?: string; avatar?: string; bio?: string }) => {
-					const name = a.name || "Unknown";
-					return {
-						name,
-						avatar:
-							a.avatar ||
-							`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
-						role: author.role,
-						bio: a.bio || undefined,
-					};
-				},
-			);
+			authors = metadata.authors.map((a: { name?: string; avatar?: string; bio?: string }) => ({
+				name: a.name || "Unknown",
+				avatar: avatarFor(a.name || "Unknown", a.avatar),
+				bio: a.bio || undefined,
+			}));
+		} else if (metadata.author) {
+			const name =
+				typeof metadata.author === "string"
+					? metadata.author
+					: metadata.author.name || "Unknown";
+			const av = typeof metadata.author === "object" ? metadata.author.avatar : undefined;
+			authors = [{ name, avatar: avatarFor(name, av) }];
+		} else {
+			authors = [{ name: "Unknown", avatar: avatarFor("Unknown") }];
 		}
 
 		article = {
 			title: metadata.title || "Untitled",
 			subtitle: metadata.subtitle || undefined,
-			author,
 			authors,
+			readingTime,
 			date: metadata.first_published_at
 				? new Date(metadata.first_published_at).toISOString()
 				: new Date().toISOString(),

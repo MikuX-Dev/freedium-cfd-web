@@ -125,6 +125,35 @@ html.dark iframe[data-iframe-id]:not([data-iframe-themed]) {
 	@apply mt-3 text-sm italic text-gray-600 dark:text-gray-400;
 }
 
+/* Bare <figure>/<figcaption> (NYT body images) */
+.prose figure {
+	@apply my-6 text-center;
+}
+.prose figure img {
+	@apply mx-auto rounded-lg my-0;
+}
+.prose figcaption {
+	@apply mt-2 text-sm italic text-gray-600 dark:text-gray-400;
+}
+
+/* Custom image layouts: grid + side-by-side diptych */
+.image-grid,
+.image-diptych {
+	@apply grid grid-cols-2 gap-3 my-6;
+}
+.image-grid figure,
+.image-diptych figure {
+	@apply my-0;
+}
+.image-grid img,
+.image-diptych img {
+	@apply w-full h-full object-cover rounded-lg;
+}
+.image-grid figcaption,
+.image-diptych figcaption {
+	@apply text-xs;
+}
+
 /* Inline elements */
 .prose strong {
 	@apply font-bold text-gray-900 dark:text-gray-100;

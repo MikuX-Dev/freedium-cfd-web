@@ -27,7 +27,7 @@
 	let { data }: Props = $props();
 
 	let article = $derived(data.article);
-	let authors = $derived(article.authors?.length ? article.authors : [article.author]);
+	let authors = $derived(article.authors ?? []);
 	let content = $derived(data.content);
 	let loading = $derived(data.loading);
 	let error = $derived(data.error);
@@ -221,7 +221,9 @@
 								<p class="font-semibold text-gray-900 dark:text-white">
 									By {authors.map((a) => a.name).join(' and ')}
 								</p>
-								<p class="text-gray-600 dark:text-gray-400">{article.author.role}</p>
+								{#if article.readingTime}
+								<p class="text-gray-600 dark:text-gray-400">{article.readingTime}</p>
+							{/if}
 								{#each authors as a (a.name)}
 									{#if a.bio}
 										<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{a.bio}</p>

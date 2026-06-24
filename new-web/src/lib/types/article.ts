@@ -7,8 +7,8 @@
  */
 export interface Author {
 	name: string;
-	role?: string;
 	avatar: string;
+	bio?: string;
 }
 
 /**
@@ -31,7 +31,8 @@ export interface Article {
 	postImage?: string | null;
 	postImageZoom?: string | null;
 	postImageCaption?: string;
-	author: Author;
+	authors: Author[];
+	readingTime?: string;
 	tableOfContents?: TableOfContentsItem[];
 }
 

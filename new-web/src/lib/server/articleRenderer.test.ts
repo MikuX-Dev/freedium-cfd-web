@@ -26,7 +26,7 @@ describe("renderArticle (web mode)", () => {
         expect(article!.title).toBe("Sample Article");
         expect(article!.subtitle).toBe("A test fixture");
         expect(article!.tableOfContents).toHaveLength(2);
-        expect(article!.author.name).toBe("Test Author");
+        expect(article!.authors[0].name).toBe("Test Author");
     });
 
     it("returns markdown body without frontmatter", async () => {

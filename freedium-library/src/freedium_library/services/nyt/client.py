@@ -966,6 +966,14 @@ class NYTClient:
         "     ... on ParagraphBlock { content { __typename ... on TextInline { text formats { __typename ... on LinkFormat { url } } } } }"
         "     ... on Heading2Block { content { ... on TextInline { text } } }"
         "     ... on ImageBlock { media { __typename ... on Image { caption { text } credit crops { renditions { url width } } } } }"
+        # Custom NYT layouts: image grid + side-by-side diptych. (media is
+        # aliased to gridMedia — ImageBlock.media is Image, GridBlock.media is
+        # [GridBlockMedia], so the same field name would otherwise conflict.)
+        "     ... on GridBlock { gridMedia: media { __typename ... on Image { caption { text } credit crops { renditions { url width } } } } }"
+        "     ... on DiptychBlock {"
+        "       imageOne { __typename ... on Image { caption { text } credit crops { renditions { url width } } } }"
+        "       imageTwo { __typename ... on Image { caption { text } credit crops { renditions { url width } } } }"
+        "     }"
         "   } }"
         " } } }"
     )

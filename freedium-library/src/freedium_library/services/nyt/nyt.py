@@ -120,11 +120,26 @@ class NytService(BaseService):
                 if text.strip():
                     out.append(f"## {text}")
             elif t == "ImageBlock":
-                img = cls._image_block_md(b)
-                if img:
-                    out.append(img)
-            # HeaderBasicBlock (headline/byline → frontmatter), InteractiveBlock,
-            # unknown → skipped.
+                fig = cls._figure_from_image(b.get("media") or {})
+                if fig:
+                    out.append(fig)
+            elif t == "GridBlock":
+                # Image grid → figures wrapped in a grid container.
+                figs = [cls._figure_from_image(m) for m in (b.get("gridMedia") or [])]
+                figs = [f for f in figs if f]
+                if figs:
+                    out.append('<div class="image-grid">' + "".join(figs) + "</div>")
+            elif t == "DiptychBlock":
+                # Two side-by-side images.
+                figs = [
+                    cls._figure_from_image(b.get("imageOne") or {}),
+                    cls._figure_from_image(b.get("imageTwo") or {}),
+                ]
+                figs = [f for f in figs if f]
+                if figs:
+                    out.append('<div class="image-diptych">' + "".join(figs) + "</div>")
+            # HeaderBasicBlock/HeaderFullBleed (lede → cover via promotionalMedia),
+            # InteractiveBlock, unknown → skipped.
         return "\n\n".join(out)
 
     @staticmethod
@@ -183,15 +198,16 @@ class NytService(BaseService):
         )
 
     @classmethod
-    def _image_block_md(cls, block: dict[str, Any]) -> str:
-        media = block.get("media") or {}
-        if media.get("__typename") != "Image":
+    def _figure_from_image(cls, image: dict[str, Any]) -> str:
+        """<figure> for a NYT Image node (caption/credit/crops). '' if no image.
+        Shared by ImageBlock, GridBlock, DiptychBlock, HeaderFullBleed."""
+        if not image or image.get("__typename") != "Image":
             return ""
-        disp, zoom = cls._pick_renditions(media.get("crops") or [])
+        disp, zoom = cls._pick_renditions(image.get("crops") or [])
         if not disp:
             return ""
-        cap = (media.get("caption") or {}).get("text") or ""
-        credit = media.get("credit") or ""
+        cap = (image.get("caption") or {}).get("text") or ""
+        credit = image.get("credit") or ""
         visible = " — ".join(p for p in (cap, credit) if p)
         # Match Medium's body-image structure: <img> with data-zoom-src +
         # data-caption (lightbox) inside a <figure> with a visible <figcaption>.
@@ -258,7 +274,6 @@ class NytService(BaseService):
 
         meta: dict[str, Any] = {
             "title": title,
-            "author": {"name": ", ".join(a["name"] for a in authors)},
             "authors": authors,
             "publication": "The New York Times",
             "is_locked": False,

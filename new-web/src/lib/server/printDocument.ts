@@ -46,7 +46,7 @@ function renderCover(article: ArticleMetadata): string {
             <h1 class="cover-title">${escapeHtml(article.title)}</h1>
             ${article.subtitle ? `<p class="cover-subtitle">${escapeHtml(article.subtitle)}</p>` : ""}
             <div class="cover-meta">
-                <p><strong>${escapeHtml(article.author.name)}</strong></p>
+                <p><strong>${escapeHtml((article.authors ?? []).map((a) => a.name).join(" and "))}</strong></p>
                 ${publishedStr ? `<p>Published ${escapeHtml(publishedStr)}</p>` : ""}
                 ${showUpdated ? `<p>Updated ${escapeHtml(updatedStr)}</p>` : ""}
                 ${article.isFree !== null ? `<p>Free: ${article.isFree ? "Yes" : "No"}</p>` : ""}

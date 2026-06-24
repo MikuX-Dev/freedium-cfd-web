@@ -147,22 +147,25 @@ html.dark iframe[data-iframe-id]:not([data-iframe-themed]) {
 	@apply text-primary underline;
 }
 
-/* Custom image layouts: grid + side-by-side diptych */
-.image-grid,
-.image-diptych {
-	@apply grid grid-cols-2 gap-3 my-6;
+/* Custom image layouts: NYT grid + side-by-side diptych. Each is a single
+   <figure> = N image cells (uniform via object-cover) + one caption spanning
+   the full width. Scoped under .prose to beat the generic `.prose figure img`. */
+.prose .image-grid,
+.prose .image-diptych {
+	@apply grid grid-cols-2 gap-2 my-6 text-center;
 }
-.image-grid figure,
-.image-diptych figure {
-	@apply my-0;
+.prose .image-grid img,
+.prose .image-diptych img {
+	@apply w-full m-0 rounded-lg;
+	aspect-ratio: 1 / 1;
+	object-fit: cover;
+	height: auto;
+	max-width: 100%;
 }
-.image-grid img,
-.image-diptych img {
-	@apply w-full h-full object-cover rounded-lg;
-}
-.image-grid figcaption,
-.image-diptych figcaption {
-	@apply text-xs;
+.prose .image-grid figcaption,
+.prose .image-diptych figcaption {
+	grid-column: 1 / -1;
+	@apply mt-1 text-sm italic text-left text-gray-600 dark:text-gray-400;
 }
 
 /* Inline elements */

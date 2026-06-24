@@ -972,7 +972,7 @@ class NYTClient:
         # Custom NYT layouts: image grid + side-by-side diptych. (media is
         # aliased to gridMedia — ImageBlock.media is Image, GridBlock.media is
         # [GridBlockMedia], so the same field name would otherwise conflict.)
-        "     ... on GridBlock { gridMedia: media { __typename ... on Image { caption { text } credit crops { renditions { url width } } } } }"
+        "     ... on GridBlock { caption credit gridMedia: media { __typename ... on Image { crops { renditions { url width } } } } }"
         "     ... on DiptychBlock {"
         "       imageOne { __typename ... on Image { caption { text } credit crops { renditions { url width } } } }"
         "       imageTwo { __typename ... on Image { caption { text } credit crops { renditions { url width } } } }"

@@ -129,20 +129,24 @@ class NytService(BaseService):
                 if fig:
                     out.append(fig)
             elif t == "GridBlock":
-                # Image grid → figures wrapped in a grid container.
-                figs = [cls._figure_from_image(m) for m in (b.get("gridMedia") or [])]
-                figs = [f for f in figs if f]
-                if figs:
-                    out.append('<div class="image-grid">' + "".join(figs) + "</div>")
+                # One <figure>: uniform image cells (CSS grid) + a single block
+                # caption below (NOT per-image), matching NYT's grid layout.
+                cap = b.get("caption") or ""  # GridBlock.caption is a String
+                fig = cls._gallery_figure(
+                    "image-grid", b.get("gridMedia") or [], cap, b.get("credit") or ""
+                )
+                if fig:
+                    out.append(fig)
             elif t == "DiptychBlock":
-                # Two side-by-side images.
-                figs = [
-                    cls._figure_from_image(b.get("imageOne") or {}),
-                    cls._figure_from_image(b.get("imageTwo") or {}),
-                ]
-                figs = [f for f in figs if f]
-                if figs:
-                    out.append('<div class="image-diptych">' + "".join(figs) + "</div>")
+                # Two side-by-side images (no block caption on DiptychBlock).
+                fig = cls._gallery_figure(
+                    "image-diptych",
+                    [b.get("imageOne") or {}, b.get("imageTwo") or {}],
+                    "",
+                    "",
+                )
+                if fig:
+                    out.append(fig)
             # HeaderBasicBlock/HeaderFullBleed (lede → cover via promotionalMedia),
             # InteractiveBlock, unknown → skipped.
         return "\n\n".join(out)
@@ -203,9 +207,9 @@ class NytService(BaseService):
         )
 
     @classmethod
-    def _figure_from_image(cls, image: dict[str, Any]) -> str:
-        """<figure> for a NYT Image node (caption/credit/crops). '' if no image.
-        Shared by ImageBlock, GridBlock, DiptychBlock, HeaderFullBleed."""
+    def _img_tag(cls, image: dict[str, Any]) -> str:
+        """A single <img> for a NYT Image node (no surrounding figure). The
+        image's own caption/credit ride along as data-caption (lightbox)."""
         if not image or image.get("__typename") != "Image":
             return ""
         disp, zoom = cls._pick_renditions(image.get("crops") or [])
@@ -214,16 +218,39 @@ class NytService(BaseService):
         cap = (image.get("caption") or {}).get("text") or ""
         credit = image.get("credit") or ""
         visible = " — ".join(p for p in (cap, credit) if p)
-        # Match Medium's body-image structure: <img> with data-zoom-src +
-        # data-caption (lightbox) inside a <figure> with a visible <figcaption>.
-        # Raw HTML block (blank lines so the markdown pipeline treats it as HTML).
         cap_attr = f' data-caption="{cls._esc(visible)}"' if visible else ""
-        figcap = f"<figcaption>{cls._esc(visible)}</figcaption>" if visible else ""
         return (
-            f'\n<figure><img src="{cls._esc(disp)}" alt="{cls._esc(cap or "image")}"'
+            f'<img src="{cls._esc(disp)}" alt="{cls._esc(cap or "image")}"'
             f' loading="lazy" data-zoom-src="{cls._esc(zoom or disp)}"{cap_attr}'
-            f' class="prose-image"/>{figcap}</figure>\n'
+            f' class="prose-image"/>'
         )
+
+    @classmethod
+    def _figure_from_image(cls, image: dict[str, Any]) -> str:
+        """Standalone <figure> for one Image (visible caption below). For
+        single ImageBlocks."""
+        img = cls._img_tag(image)
+        if not img:
+            return ""
+        cap = (image.get("caption") or {}).get("text") or ""
+        credit = image.get("credit") or ""
+        visible = " — ".join(p for p in (cap, credit) if p)
+        figcap = f"<figcaption>{cls._esc(visible)}</figcaption>" if visible else ""
+        return f"\n<figure>{img}{figcap}</figure>\n"
+
+    @classmethod
+    def _gallery_figure(
+        cls, css_class: str, images: list[dict[str, Any]], caption: str, credit: str
+    ) -> str:
+        """One <figure> holding N images in a CSS grid + a SINGLE block caption
+        spanning full width (NYT grid/diptych layout). No per-image captions."""
+        imgs = [cls._img_tag(i) for i in images]
+        imgs = [i for i in imgs if i]
+        if not imgs:
+            return ""
+        visible = " — ".join(p for p in (caption, credit) if p)
+        figcap = f"<figcaption>{cls._esc(visible)}</figcaption>" if visible else ""
+        return f'\n<figure class="{css_class}">{"".join(imgs)}{figcap}</figure>\n'
 
     # Legacy path: convert hybridBody HTML → markdown via the mdream sidecar.
     # Superseded by the structured-body renderer (which recovers inline image

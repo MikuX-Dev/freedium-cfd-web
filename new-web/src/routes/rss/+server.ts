@@ -21,6 +21,54 @@ import Parser from "rss-parser";
 // Feed source hosts + renderable article hosts we allow (SSRF guard: no
 // arbitrary fetches, no private-network hosts).
 const HOST_ALLOW = /(^|\.)(medium\.com|nytimes\.com)$/i;
+const MAX_REDIRECTS = 4;
+
+/** Throw unless the URL is http(s) on an allowlisted public host. */
+function assertAllowedUrl(u: string): URL {
+	let parsed: URL;
+	try {
+		parsed = new URL(u);
+	} catch {
+		throw error(400, "invalid url");
+	}
+	if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+		throw error(400, "unsupported protocol");
+	}
+	if (!HOST_ALLOW.test(parsed.hostname)) {
+		throw error(400, "host not allowed (medium.com / nytimes.com only)");
+	}
+	return parsed;
+}
+
+/**
+ * Fetch a feed following redirects MANUALLY, re-validating every hop against
+ * the host allowlist — so an allowlisted feed can't 3xx-redirect us into an
+ * internal/private URL (SSRF). Bounded hop count.
+ */
+async function fetchFeedSafely(startUrl: string, fetchFn: typeof fetch): Promise<Response> {
+	let current = startUrl;
+	for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+		assertAllowedUrl(current);
+		let res: Response;
+		try {
+			res = await fetchFn(current, {
+				redirect: "manual",
+				signal: AbortSignal.timeout(15_000),
+				headers: { "user-agent": "Freedium RSS" },
+			});
+		} catch {
+			throw error(502, "could not fetch source feed");
+		}
+		if (res.status >= 300 && res.status < 400) {
+			const loc = res.headers.get("location");
+			if (!loc) throw error(502, "redirect without Location");
+			current = new URL(loc, current).toString(); // re-validated next iteration
+			continue;
+		}
+		return res;
+	}
+	throw error(502, "too many redirects");
+}
 
 const MAX_ITEMS = 12; // cap per proxied feed (bounds render load)
 const RENDER_CONCURRENCY = 4;
@@ -150,28 +198,7 @@ async function proxyFeed(
 	selfUrl: string,
 	fetchFn: typeof fetch,
 ): Promise<string> {
-	let parsed: URL;
-	try {
-		parsed = new URL(feedUrl);
-	} catch {
-		throw error(400, "invalid url");
-	}
-	if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-		throw error(400, "unsupported protocol");
-	}
-	if (!HOST_ALLOW.test(parsed.hostname)) {
-		throw error(400, "feed host not allowed (medium.com / nytimes.com only)");
-	}
-
-	let src: Response;
-	try {
-		src = await fetchFn(feedUrl, {
-			signal: AbortSignal.timeout(15_000),
-			headers: { "user-agent": "Freedium RSS" },
-		});
-	} catch {
-		throw error(502, "could not fetch source feed");
-	}
+	const src = await fetchFeedSafely(feedUrl, fetchFn);
 	if (!src.ok) throw error(502, `source feed returned ${src.status}`);
 
 	const feed = await new Parser().parseString(await src.text());

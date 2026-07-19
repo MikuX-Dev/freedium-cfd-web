@@ -143,6 +143,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         else:
             logger.warning("NYT_ENABLED but NYT_SIGNING_KEY missing/invalid — NYT not registered")
 
+    # WaPo (opt-in). No auth/signing needed — the Rainbow API is open.
+    from freedium_library.api.config import WapoConfig
+
+    if WapoConfig().ENABLED:
+        from freedium_library.services.wapo import WapoService
+
+        resolver.register("wapo", WapoService())
+        logger.info("WaPo service registered")
+
     app.state.service_resolver = resolver
 
     # Wire dependency injection to modules

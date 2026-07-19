@@ -30,6 +30,8 @@ _IMG_PROXY_RE: Final = re.compile(r"^/img/(\d+)/(.+)$")
 #   /img/nyt/{path}           → static01 NYT CDN
 _IMG_MEDIUM_RE: Final = re.compile(r"^/img/medium/(\d+)/(.+)$")
 _IMG_NYT_RE: Final = re.compile(r"^/img/nyt/(.+)$")
+_IMG_WAPO_RE: Final = re.compile(r"^/img/wapo/(.+)$")
+_IMG_WAPO_LEGACY_RE: Final = re.compile(r"^/img/wapo-legacy/(.+)$")
 
 # 1x1 transparent SVG for failed/oversize fetches.
 _PLACEHOLDER_DATA_URI: Final = (
@@ -65,6 +67,12 @@ def fetch_url_for_src(src: str) -> str | None:
     n = _IMG_NYT_RE.match(src)
     if n:
         return f"https://static01.nyt.com/{n.group(1)}"
+    w = _IMG_WAPO_RE.match(src)
+    if w:
+        return f"https://cloudfront-us-east-1.images.arcpublishing.com/wapo/{w.group(1)}"
+    wl = _IMG_WAPO_LEGACY_RE.match(src)
+    if wl:
+        return f"https://img.washingtonpost.com/{wl.group(1)}"
     return None
 
 

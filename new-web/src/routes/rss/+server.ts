@@ -20,7 +20,7 @@ import Parser from "rss-parser";
 
 // Feed source hosts + renderable article hosts we allow (SSRF guard: no
 // arbitrary fetches, no private-network hosts).
-const HOST_ALLOW = /(^|\.)(medium\.com|nytimes\.com)$/i;
+const HOST_ALLOW = /(^|\.)(medium\.com|nytimes\.com|washingtonpost\.com)$/i;
 const MAX_REDIRECTS = 4;
 
 /** Throw unless the URL is http(s) on an allowlisted public host. */
@@ -35,7 +35,7 @@ function assertAllowedUrl(u: string): URL {
 		throw error(400, "unsupported protocol");
 	}
 	if (!HOST_ALLOW.test(parsed.hostname)) {
-		throw error(400, "host not allowed (medium.com / nytimes.com only)");
+		throw error(400, "host not allowed (medium.com / nytimes.com / washingtonpost.com only)");
 	}
 	return parsed;
 }

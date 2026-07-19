@@ -108,6 +108,8 @@ def _proxy() -> str | None:
 _IMG_SOURCES: dict[str, str] = {
     "medium": "https://miro.medium.com/v2/resize:fit:",  # rest = {width}/{id}
     "nyt": "https://static01.nyt.com/",                   # rest = {path}
+    "wapo": "https://cloudfront-us-east-1.images.arcpublishing.com/wapo/",
+    "wapo-legacy": "https://img.washingtonpost.com/",
 }
 
 

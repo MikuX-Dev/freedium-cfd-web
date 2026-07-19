@@ -118,6 +118,13 @@ async def render_article_async(content: str, frontmatter: bool) -> dict:
             _proxy = os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None
             resolver.register("nyt", NytService(proxy=_proxy, mdream_url=_nyt_cfg.MDREAM_URL))
 
+    from freedium_library.api.config import WapoConfig
+
+    if WapoConfig().ENABLED:
+        from freedium_library.services.wapo import WapoService
+
+        resolver.register("wapo", WapoService())
+
     service_name, resolved_service = await resolver.resolve(content)
 
     # Cap concurrent renders in the worker too: a burst of dispatched

@@ -22,8 +22,8 @@
 				onClick: () => window.open('https://discord.gg/dAxCuG9nYM', '_blank')
 			}
 		});
-		toast.info('NYT, WaPo & Bloomberg support added!', {
-			description: 'Paste any NYT, Washington Post, or Bloomberg article link to read it paywall-free.',
+		toast.info('New sources: NYT, WaPo, Bloomberg & Reuters!', {
+			description: 'Paste any NYT, WaPo, Bloomberg, or Reuters article link to read it paywall-free.',
 			duration: 8000
 		});
 	});

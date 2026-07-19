@@ -87,6 +87,14 @@ class NytConfig(BaseConfig):
     MDREAM_URL: str = Field(default="http://mdream:8085")
 
 
+class ReutersConfig(BaseConfig):
+    """Reuters service. Off by default — flip REUTERS_ENABLED=true."""
+
+    model_config = BaseSettingsConfigDict(env_prefix="REUTERS_")
+
+    ENABLED: bool = Field(default=False)
+
+
 class BloombergConfig(BaseConfig):
     """Bloomberg service. Off by default — flip BBG_ENABLED=true."""
 

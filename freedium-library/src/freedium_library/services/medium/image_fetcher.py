@@ -33,6 +33,7 @@ _IMG_NYT_RE: Final = re.compile(r"^/img/nyt/(.+)$")
 _IMG_WAPO_RE: Final = re.compile(r"^/img/wapo/(.+)$")
 _IMG_WAPO_LEGACY_RE: Final = re.compile(r"^/img/wapo-legacy/(.+)$")
 _IMG_BBG_RE: Final = re.compile(r"^/img/bbg/(.+)$")
+_IMG_REUTERS_RE: Final = re.compile(r"^/img/reuters/(.+)$")
 
 # 1x1 transparent SVG for failed/oversize fetches.
 _PLACEHOLDER_DATA_URI: Final = (
@@ -77,6 +78,9 @@ def fetch_url_for_src(src: str) -> str | None:
     bb = _IMG_BBG_RE.match(src)
     if bb:
         return f"https://assets.bwbx.io/{bb.group(1)}"
+    rt = _IMG_REUTERS_RE.match(src)
+    if rt:
+        return f"https://www.reuters.com/resizer/{rt.group(1)}"
     return None
 
 

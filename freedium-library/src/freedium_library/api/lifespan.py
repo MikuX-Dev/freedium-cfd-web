@@ -152,6 +152,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         resolver.register("wapo", WapoService())
         logger.info("WaPo service registered")
 
+    # Reuters (opt-in). No auth — ?outputType=json on any Reuters URL.
+    from freedium_library.api.config import ReutersConfig
+
+    if ReutersConfig().ENABLED:
+        from freedium_library.services.reuters import ReutersService
+
+        resolver.register("reuters", ReutersService())
+        logger.info("Reuters service registered")
+
     # Bloomberg (opt-in). No auth needed — the mobile CDN API is open.
     from freedium_library.api.config import BloombergConfig
 

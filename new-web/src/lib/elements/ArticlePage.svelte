@@ -27,7 +27,7 @@
 	let { data }: Props = $props();
 
 	let article = $derived(data.article);
-	let authors = $derived(article.authors ?? []);
+	let authors = $derived(article?.authors ?? []);
 	let content = $derived(data.content);
 	let loading = $derived(data.loading);
 	let error = $derived(data.error);

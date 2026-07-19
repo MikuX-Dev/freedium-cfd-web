@@ -104,7 +104,7 @@ class BloombergService(BaseService):
             role = comp.get("role", "")
             parts = comp.get("parts", [])
 
-            if role == "paragraph":
+            if role in ("paragraph", "p"):
                 text = cls._parts_to_md(parts)
                 if text.strip():
                     out.append(text)
@@ -130,10 +130,25 @@ class BloombergService(BaseService):
                         f'\n<figure><img src="{_esc(img_url)}" alt="{_esc(caption or "image")}"'
                         f' loading="lazy"{cap_attr} class="prose-image"/>{figcap}</figure>\n'
                     )
-            elif role == "listItem":
-                text = cls._parts_to_md(parts)
-                if text.strip():
-                    out.append(f"- {text}")
+            elif role in ("listItem", "ul"):
+                # ul.parts = [{role:"li", parts:[…]}, …]
+                li_lines: list[str] = []
+                for p in parts:
+                    if isinstance(p, dict) and p.get("role") == "li":
+                        text = cls._parts_to_md(p.get("parts", []))
+                        if text.strip():
+                            li_lines.append(f"- {text}")
+                if li_lines:
+                    out.append("\n".join(li_lines))
+                else:
+                    text = cls._parts_to_md(parts)
+                    if text.strip():
+                        out.append(f"- {text}")
+            elif role == "video":
+                video_url = comp.get("url") or comp.get("videoUrl") or ""
+                title = comp.get("title") or "Video"
+                if video_url:
+                    out.append(f"[{title}]({video_url})")
             # headline, byline, ad, etc. → skipped (metadata in frontmatter)
 
         return "\n\n".join(out)

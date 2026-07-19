@@ -18,7 +18,10 @@ from loguru import logger
 from freedium_library.services.base import BaseService
 from freedium_library.services.reuters import client as reuters_client
 
-_REUTERS_IMG_PREFIX = "https://www.reuters.com/resizer/"
+_REUTERS_IMG_PREFIXES = [
+    "https://www.reuters.com/resizer/",
+    "https://cloudfront-us-east-2.images.arcpublishing.com/reuters/",
+]
 
 
 def _normalize_url(path: str) -> str:
@@ -75,12 +78,21 @@ def _extract_article(raw: list | dict) -> dict:
                 {"name": a.get("name", "")} for a in authors if isinstance(a, dict) and a.get("name")
             ]
             article["published"] = art.get("published_time") or art.get("display_date") or ""
+            # Lead image — Reuters uses different promo_items keys: basic,
+            # images, lead_art; or a top-level thumbnail as fallback.
             promo = art.get("promo_items", {})
             if isinstance(promo, dict):
-                basic = promo.get("basic", {})
-                if isinstance(basic, dict):
-                    article["image_url"] = basic.get("url", "")
-                    article["image_caption"] = basic.get("caption", "")
+                for key in ("basic", "images", "lead_art"):
+                    cand = promo.get(key, {})
+                    if isinstance(cand, dict) and cand.get("url"):
+                        article["image_url"] = cand["url"]
+                        article["image_caption"] = cand.get("caption", "")
+                        break
+            if not article["image_url"]:
+                thumb = art.get("thumbnail", {})
+                if isinstance(thumb, dict) and thumb.get("url"):
+                    article["image_url"] = thumb["url"]
+                    article["image_caption"] = thumb.get("caption", "")
             article["content_elements"] = art.get("content_elements", [])
     return article
 
@@ -102,7 +114,9 @@ class ReutersService(BaseService):
 
         body_md = self._elements_to_markdown(article["content_elements"])
         markdown = self._frontmatter(article, url) + body_md
-        return markdown.replace(_REUTERS_IMG_PREFIX, "/img/reuters/")
+        for prefix in _REUTERS_IMG_PREFIXES:
+            markdown = markdown.replace(prefix, "/img/reuters/")
+        return markdown
 
     @staticmethod
     def _elements_to_markdown(elements: list[dict[str, Any]]) -> str:

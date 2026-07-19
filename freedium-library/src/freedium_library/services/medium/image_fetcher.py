@@ -80,7 +80,7 @@ def fetch_url_for_src(src: str) -> str | None:
         return f"https://assets.bwbx.io/{bb.group(1)}"
     rt = _IMG_REUTERS_RE.match(src)
     if rt:
-        return f"https://www.reuters.com/resizer/{rt.group(1)}"
+        return f"https://cloudfront-us-east-2.images.arcpublishing.com/reuters/{rt.group(1)}"
     return None
 
 

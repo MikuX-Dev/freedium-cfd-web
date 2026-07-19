@@ -87,6 +87,14 @@ class NytConfig(BaseConfig):
     MDREAM_URL: str = Field(default="http://mdream:8085")
 
 
+class BloombergConfig(BaseConfig):
+    """Bloomberg service. Off by default — flip BBG_ENABLED=true."""
+
+    model_config = BaseSettingsConfigDict(env_prefix="BBG_")
+
+    ENABLED: bool = Field(default=False)
+
+
 class WapoConfig(BaseConfig):
     """Washington Post service. Off by default — flip WAPO_ENABLED=true."""
 

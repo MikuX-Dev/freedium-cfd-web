@@ -125,6 +125,13 @@ async def render_article_async(content: str, frontmatter: bool) -> dict:
 
         resolver.register("wapo", WapoService())
 
+    from freedium_library.api.config import BloombergConfig
+
+    if BloombergConfig().ENABLED:
+        from freedium_library.services.bloomberg import BloombergService
+
+        resolver.register("bloomberg", BloombergService())
+
     service_name, resolved_service = await resolver.resolve(content)
 
     # Cap concurrent renders in the worker too: a burst of dispatched

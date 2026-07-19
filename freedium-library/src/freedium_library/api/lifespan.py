@@ -152,6 +152,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         resolver.register("wapo", WapoService())
         logger.info("WaPo service registered")
 
+    # Bloomberg (opt-in). No auth needed — the mobile CDN API is open.
+    from freedium_library.api.config import BloombergConfig
+
+    if BloombergConfig().ENABLED:
+        from freedium_library.services.bloomberg import BloombergService
+
+        resolver.register("bloomberg", BloombergService())
+        logger.info("Bloomberg service registered")
+
     app.state.service_resolver = resolver
 
     # Wire dependency injection to modules

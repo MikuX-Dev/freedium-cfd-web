@@ -77,6 +77,7 @@ services:
       # NYT_SIGNING_KEY lives in stack/.env (gitignored), never committed.
       # No NYT-S cookie needed — article content is public (client-side paywall).
       - WAPO_ENABLED=${WAPO_ENABLED:-false}
+      - BBG_ENABLED=${BBG_ENABLED:-false}
       - NYT_ENABLED=${NYT_ENABLED:-false}
       - NYT_SIGNING_KEY=${NYT_SIGNING_KEY:-}
       - NYT_MDREAM_URL=http://mdream:8085

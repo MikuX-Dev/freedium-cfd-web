@@ -132,6 +132,12 @@ async def render_universal(
     """
     # Reject sites that are definitely not paywalled articles (YouTube,
     # social, search, shopping) before burning any fetch/render work.
+    # Proxies/SvelteKit collapse the // in URLs → https:/host; normalize here
+    # so the L2 cache key matches the key the service stored under.
+    import re as _re
+
+    request.content = _re.sub(r"^(https?):/+", r"\1://", request.content.strip())
+
     if await is_blocked_domain(request.content):
         raise HTTPException(status_code=422, detail="unsupported_site")
 

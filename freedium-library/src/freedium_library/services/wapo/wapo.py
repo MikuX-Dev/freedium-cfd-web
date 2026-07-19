@@ -70,6 +70,9 @@ class WapoService(BaseService):
 
     async def _arender(self, path: str) -> str:
         url = _normalize_url(path)
+        # WaPo's Rainbow API returns 415 without a trailing slash.
+        if not url.endswith("/"):
+            url += "/"
         data = await wapo_client.fetch_article(url)
         if not data or not data.get("items"):
             raise ValueError("empty WaPo response")

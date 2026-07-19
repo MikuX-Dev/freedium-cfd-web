@@ -69,9 +69,9 @@
 
     <!-- Desktop Navigation -->
     <div class="items-center hidden gap-1 md:flex">
-      <Button variant="ghost" size="icon" onclick={toggleSearch} title="Search">
+      <!-- <Button variant="ghost" size="icon" onclick={toggleSearch} title="Search">
         <Search class="size-5" />
-      </Button>
+      </Button> -->
 
       <ExtensionsButton />
 
@@ -99,9 +99,9 @@
 
     <!-- Mobile Navigation -->
     <div class="flex items-center gap-1 md:hidden">
-      <Button variant="ghost" size="icon" onclick={toggleSearch} title="Search">
+      <!-- <Button variant="ghost" size="icon" onclick={toggleSearch} title="Search">
         <Search class="size-5" />
-      </Button>
+      </Button> -->
       <ReportProblem compact={true} />
       <ThemeToggle />
       <Button
@@ -150,7 +150,7 @@
   {/if}
 </nav>
 
-<SearchDialog bind:open={isSearchOpen} />
+<!-- <SearchDialog bind:open={isSearchOpen} /> -->
 
 <style>
   .header-nav {

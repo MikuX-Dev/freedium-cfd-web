@@ -88,8 +88,10 @@
             <div class="thumb-pulse" aria-hidden="true"></div>
           {/if}
         {:else}
-          <!-- No image URL, or it errored: pulsing placeholder, not alt text. -->
-          <div class="thumb-pulse" aria-hidden="true"></div>
+          <!-- No image URL or load failed: themed placeholder with title initial. -->
+          <div class="thumb-ph {phClass}" aria-hidden="true">
+            <span class="ph-letter">{title?.[0]?.toUpperCase() ?? '?'}</span>
+          </div>
         {/if}
         {#if isFeatured}
           <span class="badge"><span class="badge-dot"></span>Featured</span>

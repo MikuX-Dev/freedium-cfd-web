@@ -57,6 +57,10 @@ class EconomistService(BaseService):
             raise ValueError("empty Economist response")
 
         body_md = self._body_to_markdown(data.get("body") or [])
+        # Interactive articles (articleType=OTHER) have empty body in the API
+        # but embed readable text in the web page as inline text chunks.
+        if len(body_md) < 50:
+            body_md = await self._extract_interactive_text(url)
         if len(body_md) < 50:
             raise ValueError("no renderable body")
 
@@ -184,6 +188,40 @@ class EconomistService(BaseService):
                 break
 
         return "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + "---\n\n"
+
+    @staticmethod
+    async def _extract_interactive_text(url: str) -> str:
+        """Scrape readable text from an Economist interactive page (no body in
+        the API). Uses curl_cffi (safari impersonation) → extract text chunks
+        from the rendered HTML, filtering out JS/CSS/metadata."""
+        import asyncio
+        import re as _re
+
+        def _fetch() -> str:
+            from curl_cffi import requests as creq
+
+            r = creq.get(url, impersonate="safari", timeout=15)
+            r.raise_for_status()
+            chunks = _re.findall(r">([^<]{30,})<", r.text)
+            paras: list[str] = []
+            for c in chunks:
+                c = c.strip()
+                if not c:
+                    continue
+                if c.startswith(("{", "window.", "var ", "const ", "@", "function", "//", "import")):
+                    continue
+                if "schema.org" in c or "analyticsPrefix" in c:
+                    continue
+                if c.count("{") > 2 or c.count(";") > 3:
+                    continue
+                paras.append(c)
+            return "\n\n".join(paras)
+
+        try:
+            return await asyncio.to_thread(_fetch)
+        except Exception as exc:
+            logger.debug(f"Interactive text extraction failed: {exc}")
+            return ""
 
     def _render(self, path: str) -> str:
         raise NotImplementedError("use async _arender")

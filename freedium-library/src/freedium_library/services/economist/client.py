@@ -89,7 +89,7 @@ def fetch_article(url: str) -> dict[str, Any]:
     """Try GraphQL first, fall back to web scraping."""
     try:
         art = fetch_via_graphql(url)
-        if art and art.get("body"):
+        if art and (art.get("body") or art.get("headline")):
             art["_method"] = "graphql"
             return art
     except Exception as exc:

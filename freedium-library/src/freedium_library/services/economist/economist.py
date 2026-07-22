@@ -70,17 +70,19 @@ class EconomistService(BaseService):
         for comp in body:
             if not isinstance(comp, dict):
                 continue
-            t = comp.get("type") or comp.get("__typename") or ""
+            # GraphQL: __typename="ParagraphComponent", type="PARAGRAPH".
+            # Web: type="PARAGRAPH". Normalize to lowercase for all checks.
+            t = (comp.get("__typename") or comp.get("type") or "").lower()
 
-            if "Paragraph" in t:
+            if "paragraph" in t:
                 text = cls._annotated_text(comp)
                 if text.strip():
                     out.append(text)
-            elif "Crosshead" in t:
+            elif "crosshead" in t:
                 text = comp.get("text", "")
                 if text.strip():
                     out.append(f"## {text}")
-            elif "Image" in t:
+            elif "image" in t:
                 img_url = comp.get("url", "")
                 caption = (comp.get("caption") or {}).get("text", "") if isinstance(comp.get("caption"), dict) else ""
                 credit = comp.get("credit", "")
@@ -92,16 +94,16 @@ class EconomistService(BaseService):
                         f'\n<figure><img src="{_esc(img_url)}" alt="{_esc(caption or "image")}"'
                         f' loading="lazy"{cap_attr} class="prose-image"/>{figcap}</figure>\n'
                     )
-            elif "BlockQuote" in t or "PullQuote" in t:
+            elif "blockquote" in t or "pullquote" in t:
                 text = comp.get("text", "")
                 if text.strip():
                     out.append(f"> {text}")
-            elif "List" in t:
+            elif "list" in t:
                 for item in comp.get("items") or []:
                     text = item.get("text", "") if isinstance(item, dict) else str(item)
                     if text.strip():
                         out.append(f"- {text}")
-            elif "Infobox" in t:
+            elif "infobox" in t:
                 for sub in comp.get("components") or []:
                     sub_md = cls._body_to_markdown([sub])
                     if sub_md.strip():

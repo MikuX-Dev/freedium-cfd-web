@@ -112,6 +112,8 @@ _IMG_SOURCES: dict[str, str] = {
     "wapo-legacy": "https://img.washingtonpost.com/",
     "bbg": "https://assets.bwbx.io/",
     "reuters": "https://cloudfront-us-east-2.images.arcpublishing.com/reuters/",
+    "economist": "https://www.economist.com/cdn-cgi/image/",
+    "economist-static": "https://cdn.static-economist.com/",
 }
 
 

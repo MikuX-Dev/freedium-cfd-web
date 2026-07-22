@@ -22,8 +22,8 @@
 				onClick: () => window.open('https://discord.gg/dAxCuG9nYM', '_blank')
 			}
 		});
-		toast.info('New sources: NYT, WaPo, Bloomberg & Reuters!', {
-			description: 'Paste any NYT, WaPo, Bloomberg, or Reuters article link to read it paywall-free.',
+		toast.info('6 sources: NYT, WaPo, Bloomberg, Reuters & Economist!', {
+			description: 'Paste any paywalled article link to read it free — Medium, NYT, WaPo, Bloomberg, Reuters, or The Economist.',
 			duration: 8000
 		});
 	});

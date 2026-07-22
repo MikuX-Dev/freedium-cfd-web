@@ -152,6 +152,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         resolver.register("wapo", WapoService())
         logger.info("WaPo service registered")
 
+    # The Economist (opt-in). HMAC-signed GraphQL + curl_cffi web fallback.
+    from freedium_library.api.config import EconomistConfig
+
+    if EconomistConfig().ENABLED:
+        from freedium_library.services.economist import EconomistService
+
+        resolver.register("economist", EconomistService())
+        logger.info("Economist service registered")
+
     # Reuters (opt-in). No auth — ?outputType=json on any Reuters URL.
     from freedium_library.api.config import ReutersConfig
 

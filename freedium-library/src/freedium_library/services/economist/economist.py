@@ -63,13 +63,16 @@ class EconomistService(BaseService):
         url = _normalize_url(path)
         request = self._make_request()
         async with request:
-            data = await eco_client.fetch_article(request, url)
-            if not data:
-                raise ValueError("empty Economist response")
+            # Try GraphQL first (standard articles → full body).
+            data: dict = {}
+            try:
+                data = await eco_client.fetch_article(request, url)
+            except Exception as exc:
+                logger.debug(f"Economist fetch_article failed: {exc}")
 
-            body_md = self._body_to_markdown(data.get("body") or [])
-            # Interactive/insider articles have empty body in the GraphQL API.
-            # Fall back to fetching the web page + converting via mdream.
+            body_md = self._body_to_markdown(data.get("body") or []) if data else ""
+            # If body is empty (interactive/insider/video), fall back to the
+            # web page HTML → mdream conversion.
             if len(body_md) < 50:
                 body_md = await self._web_fallback(request, url)
             if len(body_md) < 50:

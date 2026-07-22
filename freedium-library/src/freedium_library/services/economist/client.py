@@ -24,30 +24,9 @@ GRAPHQL_URL = "https://api.economist.com/teg/content/b2c-mobile/cp2-gateway/grap
 SECRET_KEY = b"PxT9RqXllrEiW1o01DFegvK63EZy4g2H"
 DEEPLINK_OP_ID = "5b3f755e2732bec2f7fc24cbc65d56e73c446986568a61bcf7cb99000913149c"
 
-DEEPLINK_QUERY = (
-    "query ArticleDeeplinkQuery($ref: String!, $includeImageCredits: Boolean = true) {"
-    " findArticleByUrl(url: $ref) {"
-    "   id url headline rubric flyTitle byline datePublished"
-    "   section { name }"
-    "   teaserImage { type url caption { text } credit }"
-    "   leadComponent { type url caption { text } credit }"
-    "   body {"
-    "     __typename type"
-    "     ... on ParagraphComponent { text textJson annotations { type length index attributes { name value } } }"
-    "     ... on CrossheadComponent { text }"
-    "     ... on ImageComponent { url caption { text } credit }"
-    "     ... on BlockQuoteComponent { text }"
-    "     ... on PullQuoteComponent { text }"
-    "     ... on UnorderedListComponent { items { text } }"
-    "     ... on OrderedListComponent { items { text } }"
-    "     ... on InfoboxComponent { components { __typename type"
-    "       ... on ParagraphComponent { text }"
-    "       ... on CrossheadComponent { text }"
-    "     } }"
-    "   }"
-    " }"
-    "}"
-)
+# Full query from the decompiled app (com.economist.lamarr classes2.dex).
+# Must include ALL variables + fragments — the server validates strictly.
+DEEPLINK_QUERY = 'query ArticleDeeplinkQuery($ref: String!, $includeRelatedArticles: Boolean = true , $includeImageCredits: Boolean = false , $selectionMethod: NarrationSelectionMethod!) { findArticleByUrl(url: $ref) { __typename ...ArticleDataFragment } }  fragment ContentIdentityFragment on ContentIdentity { articleType forceAppWebView leadMediaType }  fragment NarrationFragment on Narration { album bitrate duration filename id provider url isAiGenerated fileHash }  fragment ImageTeaserFragment on ImageComponent { altText height imageType source url width credit @include(if: $includeImageCredits) caption @include(if: $includeImageCredits) { text textJson annotations { type length index attributes { name value } } } }  fragment PodcastAudioFragment on PodcastEpisode { id audio { url durationInSeconds } subscriberContent }  fragment PodcastShowFragment on PodcastShow { id cadence category description imageUrl slug summary title topic topics type seasonCount availableSeasons teaserColourLight teaserColourDark }  fragment ArticleTeaserFragment on Article { id tegId url rubric headline flyTitle brand byline dateFirstPublished dateline dateModified datePublished dateRevised estimatedReadTime wordCount printHeadline contentIdentity { __typename ...ContentIdentityFragment } section { tegId name } teaserImage { __typename type ...ImageTeaserFragment } leadComponent { __typename type ...ImageTeaserFragment } narration(selectionMethod: $selectionMethod) { __typename ...NarrationFragment } podcast { __typename ...PodcastAudioFragment show { __typename ...PodcastShowFragment } } }  fragment AnnotatedTextFragment on AnnotatedText { text textJson annotations { type length index attributes { name value } } }  fragment ImageComponentFragment on ImageComponent { altText caption { __typename ...AnnotatedTextFragment } credit height imageType mode source url width }  fragment BlockQuoteComponentFragment on BlockQuoteComponent { text textJson annotations { type length index attributes { name value } } }  fragment BookInfoComponentFragment on BookInfoComponent { text textJson annotations { type length index attributes { name value } } }  fragment ParagraphComponentFragment on ParagraphComponent { text textJson annotations { type length index attributes { name value } } }  fragment PullQuoteComponentFragment on PullQuoteComponent { text textJson annotations { type length index attributes { name value } } }  fragment CrossheadComponentFragment on CrossheadComponent { text }  fragment OrderedListComponentFragment on OrderedListComponent { items { __typename ...AnnotatedTextFragment } }  fragment UnorderedListComponentFragment on UnorderedListComponent { items { __typename ...AnnotatedTextFragment } }  fragment VideoComponentFragment on VideoComponent { url title thumbnailImage }  fragment InfoboxComponentFragment on InfoboxComponent { components { __typename type ...BlockQuoteComponentFragment ...BookInfoComponentFragment ...ParagraphComponentFragment ...PullQuoteComponentFragment ...CrossheadComponentFragment ...OrderedListComponentFragment ...UnorderedListComponentFragment ...VideoComponentFragment } }  fragment InfographicComponentFragment on InfographicComponent { url title width fallback { __typename ...ImageComponentFragment } altText height width }  fragment ArticleTagsFragment on Tag { id name url }  fragment PodcastTopicsFragment on PodcastEpisode { show { topics } }  fragment ArticleDataFragment on Article { id url brand byline rubric headline layout { headerStyle } contentIdentity { __typename ...ContentIdentityFragment } dateline dateFirstPublished dateModified datePublished dateRevised estimatedReadTime narration(selectionMethod: $selectionMethod) { __typename ...NarrationFragment } printFlyTitle printHeadline printRubric flyTitle wordCount section { tegId name articles(pagingInfo: { pagingType: OFFSET pageSize: 6 pageNumber: 1 } ) @include(if: $includeRelatedArticles) { edges { node { __typename ...ArticleTeaserFragment } } } } teaserImage { __typename type ...ImageComponentFragment } tegId leadComponent { __typename type ...ImageComponentFragment } body { __typename type ...BlockQuoteComponentFragment ...BookInfoComponentFragment ...ParagraphComponentFragment ...PullQuoteComponentFragment ...CrossheadComponentFragment ...OrderedListComponentFragment ...UnorderedListComponentFragment ...InfoboxComponentFragment ...ImageComponentFragment ...VideoComponentFragment ...InfographicComponentFragment } footer { __typename type ...ParagraphComponentFragment } tags { __typename ...ArticleTagsFragment } ads { adData } podcast { __typename ...PodcastAudioFragment ...PodcastTopicsFragment } aiSummary { __typename type ...UnorderedListComponentFragment } }'
 
 
 def _sign_headers(op_name: str, op_id: str) -> dict[str, str]:

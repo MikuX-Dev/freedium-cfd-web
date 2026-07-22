@@ -84,32 +84,19 @@ async def fetch_via_web(request: CurlRequest, url: str) -> dict[str, Any]:
     return data.get("props", {}).get("pageProps", {}).get("content") or {}
 
 
-async def fetch_interactive_text(request: CurlRequest, url: str) -> str:
-    """Scrape readable text from an Economist interactive page.
-    chrome146 gets 403 on /interactive/ pages; try the passed request first,
-    fall back to a safari-impersonating request."""
+async def fetch_web_html(request: CurlRequest, url: str) -> str:
+    """Fetch the Economist web page HTML. Tries chrome146, falls back to
+    safari (interactive pages block chrome)."""
     try:
         resp = await request.aget(url)
         resp.raise_for_status()
+        return resp.text
     except Exception:
         safari_req = CurlRequest(config=request.config, impersonate="safari")
         async with safari_req:
             resp = await safari_req.aget(url)
             resp.raise_for_status()
-    chunks = re.findall(r">([^<]{30,})<", resp.text)
-    paras: list[str] = []
-    for c in chunks:
-        c = c.strip()
-        if not c:
-            continue
-        if c.startswith(("{", "window.", "var ", "const ", "@", "function", "//", "import")):
-            continue
-        if "schema.org" in c or "analyticsPrefix" in c:
-            continue
-        if c.count("{") > 2 or c.count(";") > 3:
-            continue
-        paras.append(c)
-    return "\n\n".join(paras)
+            return resp.text
 
 
 async def fetch_article(request: CurlRequest, url: str) -> dict[str, Any]:

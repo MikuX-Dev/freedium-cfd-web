@@ -43,8 +43,9 @@ def _is_economist_url(url: str) -> bool:
 
 class EconomistService(BaseService):
 
-    def __init__(self, request: CurlRequest | None = None) -> None:
+    def __init__(self, request: CurlRequest | None = None, mdream_url: str = "http://mdream:8085") -> None:
         self._request = request
+        self._mdream_url = mdream_url.rstrip("/")
 
     def _make_request(self) -> CurlRequest:
         """Return the injected request or create a default one."""
@@ -67,10 +68,10 @@ class EconomistService(BaseService):
                 raise ValueError("empty Economist response")
 
             body_md = self._body_to_markdown(data.get("body") or [])
-            # Interactive articles (articleType=OTHER) have empty body in the API
-            # but embed readable text in the web page as inline text chunks.
+            # Interactive/insider articles have empty body in the GraphQL API.
+            # Fall back to fetching the web page + converting via mdream.
             if len(body_md) < 50:
-                body_md = await eco_client.fetch_interactive_text(request, url)
+                body_md = await self._web_fallback(request, url)
             if len(body_md) < 50:
                 raise ValueError("no renderable body")
 
@@ -198,6 +199,29 @@ class EconomistService(BaseService):
                 break
 
         return "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + "---\n\n"
+
+    async def _web_fallback(self, request: CurlRequest, url: str) -> str:
+        """Fetch the web page HTML + convert via mdream sidecar. Works for
+        interactive, insider, and any non-standard Economist layout."""
+        import httpx
+
+        try:
+            html = await eco_client.fetch_web_html(request, url)
+        except Exception as exc:
+            logger.debug(f"Economist web fetch failed: {exc}")
+            return ""
+        try:
+            async with httpx.AsyncClient(timeout=30) as c:
+                resp = await c.post(
+                    self._mdream_url + "/",
+                    content=html.encode("utf-8"),
+                    headers={"content-type": "text/html"},
+                )
+                resp.raise_for_status()
+                return resp.text
+        except Exception as exc:
+            logger.debug(f"mdream conversion failed: {exc}")
+            return ""
 
     def _render(self, path: str) -> str:
         raise NotImplementedError("use async _arender")

@@ -85,9 +85,17 @@ async def fetch_via_web(request: CurlRequest, url: str) -> dict[str, Any]:
 
 
 async def fetch_interactive_text(request: CurlRequest, url: str) -> str:
-    """Scrape readable text from an Economist interactive page."""
-    resp = await request.aget(url)
-    resp.raise_for_status()
+    """Scrape readable text from an Economist interactive page.
+    chrome146 gets 403 on /interactive/ pages; try the passed request first,
+    fall back to a safari-impersonating request."""
+    try:
+        resp = await request.aget(url)
+        resp.raise_for_status()
+    except Exception:
+        safari_req = CurlRequest(config=request.config, impersonate="safari")
+        async with safari_req:
+            resp = await safari_req.aget(url)
+            resp.raise_for_status()
     chunks = re.findall(r">([^<]{30,})<", resp.text)
     paras: list[str] = []
     for c in chunks:

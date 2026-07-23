@@ -90,15 +90,17 @@ class FtService(BaseService):
         async with request:
             data = await ft_client.fetch_article(request, url)
 
-        body = data.get("body", {}).get("structured", {}).get("tree", {}).get("children", [])
-        body_md = self._tree_to_markdown(body, data)
+        structured = data.get("body", {}).get("structured", {})
+        body = structured.get("tree", {}).get("children", [])
+        refs = structured.get("references", [])
+        body_md = self._tree_to_markdown(body, data, refs)
         if len(body_md) < 50:
             raise ValueError("no renderable body")
 
         return self._frontmatter(data, url) + body_md
 
     @classmethod
-    def _tree_to_markdown(cls, children: list, article: dict) -> str:
+    def _tree_to_markdown(cls, children: list, article: dict, refs: list | None = None) -> str:
         out: list[str] = []
         for node in children:
             if not isinstance(node, dict):
@@ -142,6 +144,26 @@ class FtService(BaseService):
                         f'\n<figure><img src="{_esc(img_url)}" alt="{_esc(caption or "image")}"'
                         f' loading="lazy" class="prose-image"/></figure>\n'
                     )
+            elif ntype == "image-set":
+                # Resolve via referenceIndex → refs[index].picture
+                ref_idx = (node.get("data") or {}).get("referenceIndex")
+                if refs and ref_idx is not None and ref_idx < len(refs):
+                    pic = refs[ref_idx].get("picture") or {}
+                    images = pic.get("images") or []
+                    img_url = images[0].get("url", "") if images else ""
+                    if not img_url:
+                        fb = pic.get("fallbackImage") or {}
+                        img_url = fb.get("url", "")
+                    caption = pic.get("caption") or ""
+                    credit = pic.get("credit") or ""
+                    if img_url:
+                        visible = " — ".join(p for p in (caption, credit) if p)
+                        cap_attr = f' data-caption="{_esc(visible)}"' if visible else ""
+                        figcap = f"<figcaption>{_esc(visible)}</figcaption>" if visible else ""
+                        out.append(
+                            f'\n<figure><img src="{_esc(img_url)}" alt="{_esc(caption or "image")}"'
+                            f' loading="lazy"{cap_attr} class="prose-image"/>{figcap}</figure>\n'
+                        )
             elif ntype in ("unordered-list", "ordered-list"):
                 for li in node.get("children", []):
                     text = _extract_text(li.get("children", []) if isinstance(li, dict) else [])

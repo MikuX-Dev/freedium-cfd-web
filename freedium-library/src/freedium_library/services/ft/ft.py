@@ -17,8 +17,9 @@ from freedium_library.services.base import BaseService
 from freedium_library.services.ft import client as ft_client
 from freedium_library.utils.http import CurlRequest
 
-_FT_IMG_PREFIX = "https://images.ft.com/"
-_FT_IMG_PREFIX2 = "https://d1e00ek4ebabms.cloudfront.net/"
+# FT image URLs (images.ft.com/v3/image/raw/...) are public CDN URLs that
+# work directly — no need to proxy them through /img/ft/. They include query
+# params (source, width, quality) that break the simple prefix-redirect.
 
 
 def _normalize_url(path: str) -> str:
@@ -94,9 +95,7 @@ class FtService(BaseService):
         if len(body_md) < 50:
             raise ValueError("no renderable body")
 
-        markdown = self._frontmatter(data, url) + body_md
-        markdown = markdown.replace(_FT_IMG_PREFIX, "/img/ft/")
-        return markdown.replace(_FT_IMG_PREFIX2, "/img/ft-cdn/")
+        return self._frontmatter(data, url) + body_md
 
     @classmethod
     def _tree_to_markdown(cls, children: list, article: dict) -> str:

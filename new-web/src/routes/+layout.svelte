@@ -22,8 +22,8 @@
 				onClick: () => window.open('https://discord.gg/dAxCuG9nYM', '_blank')
 			}
 		});
-		toast.info('6 new sources supported!', {
-			description: 'Paste any paywalled article — Medium, NYT, Washington Post, Bloomberg, Reuters, or The Economist.',
+		toast.info('7 new sources supported!', {
+			description: 'Medium, NYT, WaPo, Bloomberg, Reuters, Economist, and Financial Times — all paywall-free.',
 			duration: 8000
 		});
 	});

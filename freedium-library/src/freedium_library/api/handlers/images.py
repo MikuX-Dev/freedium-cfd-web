@@ -114,6 +114,8 @@ _IMG_SOURCES: dict[str, str] = {
     "reuters": "https://cloudfront-us-east-2.images.arcpublishing.com/reuters/",
     "economist": "https://www.economist.com/cdn-cgi/image/",
     "economist-static": "https://cdn.static-economist.com/",
+    "ft": "https://images.ft.com/",
+    "ft-cdn": "https://d1e00ek4ebabms.cloudfront.net/",
 }
 
 

@@ -87,6 +87,14 @@ class NytConfig(BaseConfig):
     MDREAM_URL: str = Field(default="http://mdream:8085")
 
 
+class FtConfig(BaseConfig):
+    """Financial Times service. Off by default — flip FT_ENABLED=true."""
+
+    model_config = BaseSettingsConfigDict(env_prefix="FT_")
+
+    ENABLED: bool = Field(default=False)
+
+
 class EconomistConfig(BaseConfig):
     """The Economist service. Off by default — flip ECONOMIST_ENABLED=true."""
 

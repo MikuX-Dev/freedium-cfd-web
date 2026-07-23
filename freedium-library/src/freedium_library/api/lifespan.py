@@ -152,6 +152,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         resolver.register("wapo", WapoService())
         logger.info("WaPo service registered")
 
+    # Financial Times (opt-in). Unauthenticated mobile app API.
+    from freedium_library.api.config import FtConfig
+
+    if FtConfig().ENABLED:
+        from freedium_library.services.ft import FtService
+
+        resolver.register("ft", FtService())
+        logger.info("FT service registered")
+
     # The Economist (opt-in). HMAC-signed GraphQL + curl_cffi web fallback.
     from freedium_library.api.config import EconomistConfig
 

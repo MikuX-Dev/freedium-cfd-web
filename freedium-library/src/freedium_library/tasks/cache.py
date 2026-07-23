@@ -125,6 +125,13 @@ async def render_article_async(content: str, frontmatter: bool) -> dict:
 
         resolver.register("wapo", WapoService())
 
+    from freedium_library.api.config import FtConfig
+
+    if FtConfig().ENABLED:
+        from freedium_library.services.ft import FtService
+
+        resolver.register("ft", FtService())
+
     from freedium_library.api.config import EconomistConfig
 
     if EconomistConfig().ENABLED:

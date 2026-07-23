@@ -6,6 +6,7 @@
 	import MdiFirefox from '~icons/mdi/firefox';
 	import HeroiconsOutlineExternalLink from '~icons/heroicons-outline/external-link';
 	import MdiGoogleChrome from '~icons/mdi/google-chrome';
+	import MdiAppleSafari from '~icons/mdi/apple-safari';
 	import MdiScriptText from '~icons/mdi/script-text';
 </script>
 
@@ -24,7 +25,7 @@
 	</DropdownMenu.Trigger>
 
 	<DropdownMenu.Content class="ext-menu" sideOffset={6}>
-		<div class="ext-eyebrow">Browser Extensions</div>
+		<div class="ext-eyebrow">Browser &amp; App Extensions</div>
 
 		<p class="ext-note">
 			These solutions are not developed or controlled by the Freedium team —
@@ -45,6 +46,19 @@
 				<MdiGoogleChrome class="size-4 shrink-0" />
 				<span class="ext-label">Chrome</span>
 				<HeroiconsOutlineExternalLink class="size-3.5 ext-ext shrink-0" />
+			</DropdownMenu.Item>
+			<DropdownMenu.Item class="ext-item">
+				<a
+					class="ext-link"
+					href="https://www.icloud.com/shortcuts/046dddefef2e47e2aebc20e6c81c87e1"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					<MdiAppleSafari class="size-4 shrink-0" />
+					<span class="ext-label">Safari / iOS Shortcut</span>
+					<HeroiconsOutlineExternalLink class="size-3.5 ext-ext shrink-0" />
+				</a>
+				<span class="ext-credit">by _08vishal</span>
 			</DropdownMenu.Item>
 		</DropdownMenu.Group>
 
@@ -126,6 +140,14 @@
 
 	:global(.ext-ext) {
 		color: var(--ink-3);
+	}
+
+	:global(.ext-credit) {
+		display: block;
+		font-size: 10px;
+		color: var(--ink-4);
+		padding-left: 26px;
+		margin-top: -4px;
 	}
 
 	:global(.ext-link) {

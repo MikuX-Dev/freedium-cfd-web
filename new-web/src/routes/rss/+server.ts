@@ -18,9 +18,9 @@ import config from "@/config";
 import { renderArticle } from "$lib/server/articleRenderer";
 import Parser from "rss-parser";
 
-// Feed source hosts + renderable article hosts we allow (SSRF guard: no
-// arbitrary fetches, no private-network hosts).
-const HOST_ALLOW = /(^|\.)(medium\.com|nytimes\.com|washingtonpost\.com|bloomberg\.com|reuters\.com|economist\.com|ft\.com)$/i;
+// Feed-source SSRF guard: only fetch RSS from these hosts (no arbitrary URLs).
+// Item-level support is determined by the backend resolver, not this list.
+const FEED_HOST_ALLOW = /(^|\.)(medium\.com|nytimes\.com|washingtonpost\.com|bloomberg\.com|reuters\.com|economist\.com|ft\.com|feeds\.feedburner\.com|feedproxy\.google\.com)$/i;
 const MAX_REDIRECTS = 4;
 
 /** Throw unless the URL is http(s) on an allowlisted public host. */
@@ -34,8 +34,8 @@ function assertAllowedUrl(u: string): URL {
 	if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
 		throw error(400, "unsupported protocol");
 	}
-	if (!HOST_ALLOW.test(parsed.hostname)) {
-		throw error(400, "host not allowed (medium.com / nytimes.com / washingtonpost.com only)");
+	if (!FEED_HOST_ALLOW.test(parsed.hostname)) {
+		throw error(400, "feed host not allowed");
 	}
 	return parsed;
 }
@@ -206,26 +206,26 @@ async function proxyFeed(
 
 	const items = await mapLimit(entries, RENDER_CONCURRENCY, async (e) => {
 		const articleUrl = (e.link || "").trim();
-		let host = "";
-		try {
-			host = new URL(articleUrl).hostname;
-		} catch {
-			return null;
-		}
-		const supported = HOST_ALLOW.test(host);
-		const link = supported ? `${config.SITE_URL}/${articleUrl}` : articleUrl;
+		if (!articleUrl) return null;
 
+		// Try to render every item — the backend resolver IS the allowlist.
+		// If the URL is unsupported, renderArticle fails → item stays link-only.
 		let contentHtml = "";
-		if (supported) {
-			try {
-				const r = await withTimeout(
-					renderArticle(articleUrl, { mode: "web" }),
-					PER_ITEM_TIMEOUT_MS,
-				);
-				if (r?.html) contentHtml = absolutize(r.html);
-			} catch {
-				// render failed/timed out → item stays link-only
+		let rendered = false;
+		try {
+			const r = await withTimeout(
+				renderArticle(articleUrl, { mode: "web" }),
+				PER_ITEM_TIMEOUT_MS,
+			);
+			if (r?.html) {
+				contentHtml = absolutize(r.html);
+				rendered = true;
 			}
+		} catch {
+			// render failed/timed out → item stays link-only
+		}
+		const link = rendered ? `${config.SITE_URL}/${articleUrl}` : articleUrl;
+		{
 		}
 		return {
 			title: e.title || "Untitled",

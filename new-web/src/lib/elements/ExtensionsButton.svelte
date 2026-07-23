@@ -47,7 +47,7 @@
 				<span class="ext-label">Chrome</span>
 				<HeroiconsOutlineExternalLink class="size-3.5 ext-ext shrink-0" />
 			</DropdownMenu.Item>
-			<DropdownMenu.Item class="ext-item">
+			<DropdownMenu.Item class="ext-item ext-item-stacked">
 				<a
 					class="ext-link"
 					href="https://www.icloud.com/shortcuts/046dddefef2e47e2aebc20e6c81c87e1"
@@ -58,7 +58,7 @@
 					<span class="ext-label">Safari / iOS Shortcut</span>
 					<HeroiconsOutlineExternalLink class="size-3.5 ext-ext shrink-0" />
 				</a>
-				<span class="ext-credit">by _08vishal</span>
+				<span class="ext-credit">by _08vishal on Discord</span>
 			</DropdownMenu.Item>
 		</DropdownMenu.Group>
 
@@ -142,12 +142,15 @@
 		color: var(--ink-3);
 	}
 
+	:global(.ext-item-stacked) {
+		flex-wrap: wrap !important;
+	}
 	:global(.ext-credit) {
-		display: block;
+		width: 100%;
 		font-size: 10px;
 		color: var(--ink-4);
 		padding-left: 26px;
-		margin-top: -4px;
+		margin-top: -2px;
 	}
 
 	:global(.ext-link) {

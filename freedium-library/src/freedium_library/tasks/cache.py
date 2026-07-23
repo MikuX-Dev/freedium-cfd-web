@@ -102,11 +102,7 @@ async def render_article_async(content: str, frontmatter: bool) -> dict:
 
     from freedium_library.api.config import MediumConfig, NytConfig
 
-    if MediumConfig().ENABLED:
-        resolver.register("medium", service)
-
-    # The worker handles cold renders too, so it must resolve the same services
-    # the inline backend does (else a cold NYT render fails with "no service").
+    # Specific-host services FIRST; Medium last (permissive validator).
     _nyt_cfg = NytConfig()
     if _nyt_cfg.ENABLED:
         import os
@@ -152,6 +148,10 @@ async def render_article_async(content: str, frontmatter: bool) -> dict:
         from freedium_library.services.bloomberg import BloombergService
 
         resolver.register("bloomberg", BloombergService())
+
+    # Medium LAST — permissive validator (accepts any URL).
+    if MediumConfig().ENABLED:
+        resolver.register("medium", service)
 
     service_name, resolved_service = await resolver.resolve(content)
 

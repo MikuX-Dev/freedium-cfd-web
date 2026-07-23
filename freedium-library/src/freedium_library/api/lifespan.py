@@ -115,15 +115,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize service resolver
     resolver = ServiceResolver()
 
-    # Register services
-    from freedium_library.api.config import MediumConfig
-
+    # Register specific-host services BEFORE Medium. Medium's validator is
+    # permissive — it accepts any URL and tries to resolve it as a Medium
+    # post, so it must be last to avoid stealing FT/NYT/WaPo/etc. URLs.
     medium_service = medium_container.service()
-    if MediumConfig().ENABLED:
-        resolver.register("medium", medium_service)
-        logger.info("Medium service registered")
-    else:
-        logger.info("Medium service disabled (MEDIUM_ENABLED=false)")
 
     # NYT (opt-in). Needs NYT_SIGNING_KEY in env (the RSA signing key, never
     # committed); without it the client can't sign → leave unregistered.
@@ -187,6 +182,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         resolver.register("bloomberg", BloombergService())
         logger.info("Bloomberg service registered")
+
+    # Medium LAST — its validator is permissive (accepts any URL, tries to
+    # resolve as a Medium post). Specific-host services must match first.
+    from freedium_library.api.config import MediumConfig
+
+    if MediumConfig().ENABLED:
+        resolver.register("medium", medium_service)
+        logger.info("Medium service registered (last — catch-all)")
+    else:
+        logger.info("Medium service disabled (MEDIUM_ENABLED=false)")
 
     app.state.service_resolver = resolver
 

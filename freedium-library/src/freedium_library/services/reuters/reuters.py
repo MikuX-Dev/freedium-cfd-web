@@ -17,6 +17,7 @@ from loguru import logger
 
 from freedium_library.services.base import BaseService
 from freedium_library.services.reuters import client as reuters_client
+from freedium_library.utils.http import CurlRequest
 
 _REUTERS_IMG_PREFIXES = [
     "https://www.reuters.com/resizer/",
@@ -99,6 +100,9 @@ def _extract_article(raw: list | dict) -> dict:
 
 class ReutersService(BaseService):
 
+    def __init__(self, request: CurlRequest | None = None) -> None:
+        self._request = request
+
     def _is_valid(self, path: str) -> bool:
         return _is_reuters_url(path)
 
@@ -107,7 +111,9 @@ class ReutersService(BaseService):
 
     async def _arender(self, path: str) -> str:
         url = _normalize_url(path)
-        raw = await reuters_client.fetch_article(url)
+        request = self._request or CurlRequest()
+        async with request:
+            raw = await reuters_client.fetch_article(request, url)
         article = _extract_article(raw)
         if not article["title"] and not article["content_elements"]:
             raise ValueError("empty Reuters response")
@@ -143,6 +149,10 @@ class ReutersService(BaseService):
                         f'\n<figure><img src="{_esc(img_url)}" alt="{_esc(caption or "image")}"'
                         f' loading="lazy"{cap_attr} class="prose-image"/>{figcap}</figure>\n'
                     )
+            elif t == "pullquote":
+                text = re.sub(r"<[^>]+>", "", str(content)).strip()
+                if text:
+                    out.append(f"> {text}")
             elif t == "list":
                 for item in elem.get("items") or []:
                     if isinstance(item, dict):

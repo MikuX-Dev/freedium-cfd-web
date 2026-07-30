@@ -1,11 +1,14 @@
 """Reuters article client — appends ?outputType=json to any Reuters URL.
 
 Returns the full article JSON including premium/metered content without
-any paywall enforcement. No auth, no signing.
+any paywall enforcement. Uses CurlRequest (chrome TLS fingerprint) to
+bypass Cloudflare bot detection on /investigations/ articles.
 """
 from __future__ import annotations
 
-import httpx
+from typing import Any
+
+from freedium_library.utils.http import CurlRequest
 
 HEADERS = {
     "User-Agent": (
@@ -18,10 +21,9 @@ HEADERS = {
 }
 
 
-async def fetch_article(url: str, timeout: int = 20) -> list:
+async def fetch_article(request: CurlRequest, url: str) -> list[dict[str, Any]]:
     """Fetch the full article JSON blocks."""
     fetch_url = url.rstrip("/") + "/?outputType=json" if "?" not in url else url + "&outputType=json"
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(fetch_url, headers=HEADERS, timeout=timeout, follow_redirects=True)
-        resp.raise_for_status()
-        return resp.json()
+    resp = await request.aget(fetch_url, headers=HEADERS)
+    resp.raise_for_status()
+    return resp.json()

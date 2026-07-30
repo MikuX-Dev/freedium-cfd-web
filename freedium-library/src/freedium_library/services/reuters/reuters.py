@@ -100,8 +100,16 @@ def _extract_article(raw: list | dict) -> dict:
 
 class ReutersService(BaseService):
 
-    def __init__(self, request: CurlRequest | None = None) -> None:
-        self._request = request
+    def __init__(self, proxy: str | None = None) -> None:
+        from freedium_library.utils.http.client.config import RequestConfig, RequestProxyConfig
+
+        self._config = RequestConfig()
+        if proxy:
+            parts = proxy.split("://", 1)
+            scheme = parts[0] if len(parts) > 1 else "socks5"
+            hostport = parts[1] if len(parts) > 1 else parts[0]
+            host, _, port_s = hostport.rpartition(":")
+            self._config.proxy = RequestProxyConfig(type=scheme, host=host, port=int(port_s or 1080))
 
     def _is_valid(self, path: str) -> bool:
         return _is_reuters_url(path)
@@ -111,7 +119,7 @@ class ReutersService(BaseService):
 
     async def _arender(self, path: str) -> str:
         url = _normalize_url(path)
-        request = self._request or CurlRequest()
+        request = CurlRequest(config=self._config)
         async with request:
             raw = await reuters_client.fetch_article(request, url)
         article = _extract_article(raw)

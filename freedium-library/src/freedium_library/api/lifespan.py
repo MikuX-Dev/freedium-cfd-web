@@ -171,7 +171,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if ReutersConfig().ENABLED:
         from freedium_library.services.reuters import ReutersService
 
-        resolver.register("reuters", ReutersService())
+        _reuters_proxy = os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None
+        resolver.register("reuters", ReutersService(proxy=_reuters_proxy))
         logger.info("Reuters service registered")
 
     # Bloomberg (opt-in). No auth needed — the mobile CDN API is open.

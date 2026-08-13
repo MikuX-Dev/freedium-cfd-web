@@ -72,8 +72,11 @@ def _extract_article(raw: list | dict) -> dict:
             art = data.get("article", data)
             if art.get("title"):
                 article["title"] = art["title"]
-            if art.get("description"):
-                article["description"] = art["description"]
+            # `subtitle` is the standfirst shown on the page; `description` is
+            # the (differently worded, shorter) SEO blurb. Prefer the former.
+            article["description"] = (
+                art.get("subtitle") or art.get("description") or article["description"]
+            )
             authors = art.get("authors") or []
             article["authors"] = [
                 {"name": a.get("name", "")} for a in authors if isinstance(a, dict) and a.get("name")

@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 import json
-import os
 
 from loguru import logger
-from redis.asyncio import Redis
+from freedium_library.utils.cache.redis_client import get_redis
 
 from freedium_library.tasks import broker
 
@@ -18,8 +17,9 @@ async def refresh_random_posts() -> None:
     freedium:random_posts (JSON array, 130s TTL) so the
     /api/articles/random endpoint is a single Redis GET.
     """
-    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-    r = Redis.from_url(redis_url, decode_responses=True)
+    r = get_redis()
+    if r is None:
+        return
 
     try:
         post_ids = await r.zrandmember("freedium:recent_posts", count=20)
@@ -36,5 +36,4 @@ async def refresh_random_posts() -> None:
             logger.info(f"refresh_random_posts: cached {len(posts_json)} random posts")
     except Exception as exc:
         logger.warning(f"refresh_random_posts failed: {exc!r}")
-    finally:
-        await r.aclose()
+    # NB: no aclose() — the client is shared process-wide.

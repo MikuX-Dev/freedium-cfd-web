@@ -71,12 +71,10 @@ def _extract_text(children: list) -> str:
 class FtService(BaseService):
 
     def __init__(self, request: CurlRequest | None = None) -> None:
-        self._request = request
-
-    def _make_request(self) -> CurlRequest:
-        if self._request is not None:
-            return self._request
-        return CurlRequest()
+        # One client per service (services are registered as singletons), so
+        # the underlying session and its connection pool are reused across
+        # renders instead of being rebuilt — and torn down — every time.
+        self._request = request or CurlRequest(persistent=True)
 
     def _is_valid(self, path: str) -> bool:
         return _is_ft_url(path)
@@ -86,9 +84,7 @@ class FtService(BaseService):
 
     async def _arender(self, path: str) -> str:
         url = _normalize_url(path)
-        request = self._make_request()
-        async with request:
-            data = await ft_client.fetch_article(request, url)
+        data = await ft_client.fetch_article(self._request, url)
 
         structured = data.get("body", {}).get("structured", {})
         body = structured.get("tree", {}).get("children", [])

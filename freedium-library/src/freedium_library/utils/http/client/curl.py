@@ -11,20 +11,28 @@ from .response import AbstractResponse
 
 
 class CurlRequest(AbstractRequest):
-    __slots__ = ("config", "_in_context_manager", "_session", "_async_session", "_impersonate", "_http_version")
+    __slots__ = ("config", "_in_context_manager", "_session", "_async_session", "_impersonate", "_http_version", "_persistent")
 
-    def __init__(self, config: Optional[RequestConfig] = None, impersonate: str = "chrome146"):
+    def __init__(
+        self,
+        config: Optional[RequestConfig] = None,
+        impersonate: str = "chrome146",
+        persistent: bool = False,
+    ):
+        """`persistent=True` marks a deliberately long-lived client — one owned
+        by a singleton service and reused for the process lifetime, so its
+        session and connection pool survive across requests. It opts out of the
+        context-manager warnings, which exist to catch *accidental* misuse."""
         self.config = config or RequestConfig()
+        self._persistent = persistent
         self._in_context_manager = False
         self._session: Any = None
         self._async_session: Any = None
         self._impersonate: str = impersonate
         self._http_version: Literal["v2"] = "v2"  # H2 over WARP TCP; H3 (QUIC) breaks through SOCKS5
-        warnings.warn(
-            "Request should be used as a context manager using 'with' or 'async with' "
-            "to ensure proper resource cleanup",
-            stacklevel=2,
-        )
+        # NB: no warning here. Constructing a client is legitimate — misuse is
+        # only detectable at request time, which `_check_context_manager` does.
+        # Warning in __init__ fired on every correctly-written `async with` too.
 
     @property
     def _proxies(self) -> Optional[Dict[str, str]]:
@@ -79,10 +87,22 @@ class CurlRequest(AbstractRequest):
     def __del__(self):
         if self._session:
             self._session.close()
-        # Can't handle async session cleanup in __del__
+        if self._async_session and not self._persistent:
+            # An async session can't be awaited closed from __del__, so it can
+            # only be reported. Reaching here means a caller built the client
+            # and issued async requests without `async with` — the session's
+            # connections leak until the process exits. Surface it rather than
+            # failing silently. (Persistent clients are exempt: living for the
+            # process lifetime is the point.)
+            warnings.warn(
+                "CurlRequest garbage-collected with an open async session — "
+                "its connections leaked. Use 'async with' at the call site.",
+                ResourceWarning,
+                stacklevel=2,
+            )
 
     def _check_context_manager(self):
-        if not self._in_context_manager:
+        if not self._in_context_manager and not self._persistent:
             warnings.warn(
                 "Request is not being used as a context manager. This may lead to "
                 "resource leaks. Use 'with' or 'async with' statement.",

@@ -7,6 +7,8 @@ from beartype import beartype
 from loguru import logger
 from redis.asyncio import Redis
 
+from freedium_library.utils.cache.redis_client import get_redis
+
 from freedium_library.services.medium.renderer import PostMetadata
 from .models import RecentPost
 
@@ -33,8 +35,9 @@ class RecentPostsService:
         max_size: int = _DEFAULT_BUFFER_SIZE,
     ) -> None:
         self._max_size = max_size
-        url = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-        self._redis: Redis = Redis.from_url(url, decode_responses=True)
+        # None → the shared process-wide client; an explicit url → a dedicated
+        # one (see get_redis).
+        self._redis: Redis = get_redis(redis_url)
 
     @beartype
     async def record(self, metadata: PostMetadata) -> None:

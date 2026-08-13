@@ -18,15 +18,12 @@ async def _unlocked_count() -> int:
     """Read the count from Redis (kept warm by refresh_article_count). Cold
     fallback before the first scheduled run: compute from Mongo once and seed
     Redis. Degrades to 0 (→ the banner hides the stat), never 500s."""
-    import os
-
-    from redis.asyncio import Redis
-
+    from freedium_library.utils.cache.redis_client import get_redis
     from freedium_library.utils.mongo import get_collection
 
-    r = Redis.from_url(
-        os.environ.get("REDIS_URL", "redis://localhost:6379/0"), decode_responses=True
-    )
+    r = get_redis()
+    if r is None:
+        return 0
     try:
         cached = await r.get(_ARTICLE_COUNT_KEY)
         if cached is not None:
@@ -36,8 +33,7 @@ async def _unlocked_count() -> int:
         return n
     except Exception:  # noqa: BLE001
         return 0
-    finally:
-        await r.aclose()
+    # NB: no aclose() — the client is shared process-wide (see redis_client).
 
 
 @beartype
@@ -81,14 +77,13 @@ def register_articles_router(router: APIRouter) -> None:
         ),
     ) -> RecentPostsResponse:
         import json
-        import os
-
-        from redis.asyncio import Redis
 
         from freedium_library.services.recent_posts.models import RecentPost
+        from freedium_library.utils.cache.redis_client import get_redis
 
-        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-        r = Redis.from_url(redis_url, decode_responses=True)
+        r = get_redis()
+        if r is None:
+            return RecentPostsResponse(posts=[])
         try:
             raw = await r.get("freedium:random_posts")
             if not raw:
@@ -98,8 +93,7 @@ def register_articles_router(router: APIRouter) -> None:
             return RecentPostsResponse(posts=posts)
         except Exception:  # noqa: BLE001
             return RecentPostsResponse(posts=[])
-        finally:
-            await r.aclose()
+        # NB: no aclose() — the client is shared process-wide.
 
     articles_router.add_api_route(
         "/random",

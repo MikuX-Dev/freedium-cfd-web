@@ -83,6 +83,79 @@ from freedium_library.services.resolver import ServiceResolver
 
 from . import broker
 
+_resolver: ServiceResolver | None = None
+
+
+def _get_resolver() -> ServiceResolver:
+    """Build the worker's resolver once, then reuse it.
+
+    Must be process-wide, not per task: the services own long-lived HTTP
+    clients, so rebuilding them on every render would open (and never close)
+    a fresh connection pool per article. Mirrors the registration order in
+    api/lifespan.py — specific hosts first, Medium last, because Medium's
+    validator accepts any URL.
+    """
+    global _resolver
+    if _resolver is not None:
+        return _resolver
+
+    import os
+
+    from freedium_library.api.config import (
+        BloombergConfig,
+        EconomistConfig,
+        FtConfig,
+        MediumConfig,
+        NytConfig,
+        ReutersConfig,
+        WapoConfig,
+    )
+
+    resolver = ServiceResolver()
+    proxy = os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None
+
+    nyt_cfg = NytConfig()
+    if nyt_cfg.ENABLED:
+        from freedium_library.services.nyt import NytService
+        from freedium_library.services.nyt import client as nyt_client
+
+        if nyt_client._NYT_PRIVATE_KEY is not None:
+            resolver.register(
+                "nyt", NytService(proxy=proxy, mdream_url=nyt_cfg.MDREAM_URL)
+            )
+
+    if WapoConfig().ENABLED:
+        from freedium_library.services.wapo import WapoService
+
+        resolver.register("wapo", WapoService())
+
+    if FtConfig().ENABLED:
+        from freedium_library.services.ft import FtService
+
+        resolver.register("ft", FtService())
+
+    if EconomistConfig().ENABLED:
+        from freedium_library.services.economist import EconomistService
+
+        resolver.register("economist", EconomistService())
+
+    if ReutersConfig().ENABLED:
+        from freedium_library.services.reuters import ReutersService
+
+        resolver.register("reuters", ReutersService(proxy=proxy))
+
+    if BloombergConfig().ENABLED:
+        from freedium_library.services.bloomberg import BloombergService
+
+        resolver.register("bloomberg", BloombergService())
+
+    # Medium LAST — permissive validator (accepts any URL).
+    if MediumConfig().ENABLED:
+        resolver.register("medium", MediumContainer().service())
+
+    _resolver = resolver
+    return _resolver
+
 
 @broker.task
 async def render_article_async(content: str, frontmatter: bool) -> dict:
@@ -96,64 +169,7 @@ async def render_article_async(content: str, frontmatter: bool) -> dict:
     A plain Exception raised here becomes `result.is_err = True`.
     The poll endpoint surfaces a user-safe error message.
     """
-    container = MediumContainer()
-    service = container.service()
-    resolver = ServiceResolver()
-
-    from freedium_library.api.config import MediumConfig, NytConfig
-
-    # Specific-host services FIRST; Medium last (permissive validator).
-    _nyt_cfg = NytConfig()
-    if _nyt_cfg.ENABLED:
-        import os
-
-        from freedium_library.services.nyt import NytService
-        from freedium_library.services.nyt import client as _nyt_client
-
-        if _nyt_client._NYT_PRIVATE_KEY is not None:
-            _proxy = os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None
-            resolver.register("nyt", NytService(proxy=_proxy, mdream_url=_nyt_cfg.MDREAM_URL))
-
-    from freedium_library.api.config import WapoConfig
-
-    if WapoConfig().ENABLED:
-        from freedium_library.services.wapo import WapoService
-
-        resolver.register("wapo", WapoService())
-
-    from freedium_library.api.config import FtConfig
-
-    if FtConfig().ENABLED:
-        from freedium_library.services.ft import FtService
-
-        resolver.register("ft", FtService())
-
-    from freedium_library.api.config import EconomistConfig
-
-    if EconomistConfig().ENABLED:
-        from freedium_library.services.economist import EconomistService
-
-        resolver.register("economist", EconomistService())
-
-    from freedium_library.api.config import ReutersConfig
-
-    if ReutersConfig().ENABLED:
-        from freedium_library.services.reuters import ReutersService
-
-        _reuters_proxy = os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None
-        resolver.register("reuters", ReutersService(proxy=_reuters_proxy))
-
-    from freedium_library.api.config import BloombergConfig
-
-    if BloombergConfig().ENABLED:
-        from freedium_library.services.bloomberg import BloombergService
-
-        resolver.register("bloomberg", BloombergService())
-
-    # Medium LAST — permissive validator (accepts any URL).
-    if MediumConfig().ENABLED:
-        resolver.register("medium", service)
-
+    resolver = _get_resolver()
     service_name, resolved_service = await resolver.resolve(content)
 
     # Cap concurrent renders in the worker too: a burst of dispatched

@@ -22,35 +22,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any
 
 from loguru import logger
 
+from freedium_library.utils.cache.redis_client import get_redis
+
 _MISS = object()
-
-# One shared client (and connection pool) for every cache namespace.
-_client: Any = None
-_client_failed = False
-
-
-def _redis() -> Any:
-    """Shared async Redis client, or None when Redis isn't reachable."""
-    global _client, _client_failed
-    if _client is None and not _client_failed:
-        try:
-            from redis.asyncio import Redis
-
-            _client = Redis.from_url(
-                os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
-                decode_responses=True,
-            )
-        except Exception as exc:  # noqa: BLE001 — caching is always optional
-            logger.debug(f"RedisTTLCache: Redis unavailable ({exc!r})")
-            _client_failed = True
-    return _client
 
 
 @dataclass(slots=True)
@@ -76,7 +56,7 @@ class RedisTTLCache:
 
     async def get(self, key: str) -> Any:
         """Cached value, or the `MISS` sentinel. A cached `None` is a hit."""
-        redis = _redis()
+        redis = get_redis()
         if redis is None:
             return _MISS
         try:
@@ -87,7 +67,7 @@ class RedisTTLCache:
             return _MISS
 
     async def set(self, key: str, value: Any) -> None:
-        redis = _redis()
+        redis = get_redis()
         if redis is None:
             return
         try:

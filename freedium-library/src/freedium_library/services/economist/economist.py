@@ -44,14 +44,10 @@ def _is_economist_url(url: str) -> bool:
 class EconomistService(BaseService):
 
     def __init__(self, request: CurlRequest | None = None, mdream_url: str = "http://mdream:8085") -> None:
-        self._request = request
+        # One client per service (services are singletons), so the session and
+        # its connection pool are reused across renders.
+        self._request = request or CurlRequest(persistent=True)
         self._mdream_url = mdream_url.rstrip("/")
-
-    def _make_request(self) -> CurlRequest:
-        """Return the injected request or create a default one."""
-        if self._request is not None:
-            return self._request
-        return CurlRequest()
 
     def _is_valid(self, path: str) -> bool:
         return _is_economist_url(path)
@@ -61,22 +57,22 @@ class EconomistService(BaseService):
 
     async def _arender(self, path: str) -> str:
         url = _normalize_url(path)
-        request = self._make_request()
-        async with request:
-            # Try GraphQL first (standard articles → full body).
-            data: dict = {}
-            try:
-                data = await eco_client.fetch_article(request, url)
-            except Exception as exc:
-                logger.debug(f"Economist fetch_article failed: {exc}")
+        request = self._request
 
-            body_md = self._body_to_markdown(data.get("body") or []) if data else ""
-            # If body is empty (interactive/insider/video), fall back to the
-            # web page HTML → mdream conversion.
-            if len(body_md) < 50:
-                body_md = await self._web_fallback(request, url)
-            if len(body_md) < 50:
-                raise ValueError("no renderable body")
+        # Try GraphQL first (standard articles → full body).
+        data: dict = {}
+        try:
+            data = await eco_client.fetch_article(request, url)
+        except Exception as exc:
+            logger.debug(f"Economist fetch_article failed: {exc}")
+
+        body_md = self._body_to_markdown(data.get("body") or []) if data else ""
+        # If body is empty (interactive/insider/video), fall back to the
+        # web page HTML → mdream conversion.
+        if len(body_md) < 50:
+            body_md = await self._web_fallback(request, url)
+        if len(body_md) < 50:
+            raise ValueError("no renderable body")
 
         markdown = self._frontmatter(data, url) + body_md
         markdown = markdown.replace(_ECO_IMG_PREFIX, "/img/economist/")

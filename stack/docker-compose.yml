@@ -80,6 +80,8 @@ services:
       # NYT_SIGNING_KEY lives in stack/.env (gitignored), never committed.
       # No NYT-S cookie needed — article content is public (client-side paywall).
       - WAPO_ENABLED=${WAPO_ENABLED:-false}
+      - ATHLETIC_ENABLED=${ATHLETIC_ENABLED:-false}
+      - ATHLETIC_MDREAM_URL=http://mdream:8085
       - FT_ENABLED=${FT_ENABLED:-false}
       - ECONOMIST_ENABLED=${ECONOMIST_ENABLED:-false}
       - REUTERS_ENABLED=${REUTERS_ENABLED:-false}

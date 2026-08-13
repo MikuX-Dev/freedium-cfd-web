@@ -102,6 +102,7 @@ def _get_resolver() -> ServiceResolver:
     import os
 
     from freedium_library.api.config import (
+        AthleticConfig,
         BloombergConfig,
         EconomistConfig,
         FtConfig,
@@ -113,6 +114,13 @@ def _get_resolver() -> ServiceResolver:
 
     resolver = ServiceResolver()
     proxy = os.environ.get("PROXY_LIST", "").split(",")[0].strip() or None
+
+    # Before NYT — see the matching comment in api/lifespan.py.
+    ath_cfg = AthleticConfig()
+    if ath_cfg.ENABLED:
+        from freedium_library.services.athletic import AthleticService
+
+        resolver.register("athletic", AthleticService(mdream_url=ath_cfg.MDREAM_URL))
 
     nyt_cfg = NytConfig()
     if nyt_cfg.ENABLED:

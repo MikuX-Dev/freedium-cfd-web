@@ -87,6 +87,15 @@ class NytConfig(BaseConfig):
     MDREAM_URL: str = Field(default="http://mdream:8085")
 
 
+class AthleticConfig(BaseConfig):
+    """The Athletic. Off by default — flip ATHLETIC_ENABLED=true."""
+
+    model_config = BaseSettingsConfigDict(env_prefix="ATHLETIC_")
+
+    ENABLED: bool = Field(default=False)
+    MDREAM_URL: str = Field(default="http://mdream:8085")
+
+
 class FtConfig(BaseConfig):
     """Financial Times service. Off by default — flip FT_ENABLED=true."""
 

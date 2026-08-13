@@ -20,7 +20,7 @@ import Parser from "rss-parser";
 
 // Feed-source SSRF guard: only fetch RSS from these hosts (no arbitrary URLs).
 // Item-level support is determined by the backend resolver, not this list.
-const FEED_HOST_ALLOW = /(^|\.)(medium\.com|nytimes\.com|washingtonpost\.com|bloomberg\.com|reuters\.com|economist\.com|ft\.com|feeds\.feedburner\.com|feedproxy\.google\.com)$/i;
+const FEED_HOST_ALLOW = /(^|\.)(medium\.com|nytimes\.com|washingtonpost\.com|bloomberg\.com|reuters\.com|economist\.com|ft\.com|theathletic\.com|feeds\.feedburner\.com|feedproxy\.google\.com)$/i;
 const MAX_REDIRECTS = 4;
 
 /** Throw unless the URL is http(s) on an allowlisted public host. */

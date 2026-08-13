@@ -120,6 +120,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # post, so it must be last to avoid stealing FT/NYT/WaPo/etc. URLs.
     medium_service = medium_container.service()
 
+    # The Athletic (opt-in). Before NYT: its articles live under
+    # nytimes.com/athletic/. NytService's path rules don't claim those today,
+    # but registering first keeps that true if those rules ever loosen.
+    from freedium_library.api.config import AthleticConfig
+
+    _ath_cfg = AthleticConfig()
+    if _ath_cfg.ENABLED:
+        from freedium_library.services.athletic import AthleticService
+
+        resolver.register("athletic", AthleticService(mdream_url=_ath_cfg.MDREAM_URL))
+        logger.info("Athletic service registered")
+
     # NYT (opt-in). Needs NYT_SIGNING_KEY in env (the RSA signing key, never
     # committed); without it the client can't sign → leave unregistered.
     from freedium_library.api.config import NytConfig

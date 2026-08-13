@@ -25,15 +25,16 @@ from __future__ import annotations
 import asyncio
 import html
 import re
-import time
 from collections.abc import Callable, Coroutine
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any, Final, Literal, Protocol, runtime_checkable
 
 import httpx
 from beartype import beartype
 from bs4 import BeautifulSoup, Tag
 from loguru import logger
+
+from freedium_library.utils.cache.redis_ttl import RedisTTLCache
 
 # <iframe ... data-iframe-id="..." ... srcdoc="..." ... ></iframe>
 _IFRAME_RE: Final[re.Pattern[str]] = re.compile(
@@ -185,23 +186,21 @@ def _render_files(files: list[GistFile]) -> str:
 _DEFAULT_TTL_SECONDS: Final[float] = 600.0
 _DEFAULT_TIMEOUT_SECONDS: Final[float] = 10.0
 
+# Shared across resolver instances, uvicorn workers and backend replicas.
+# Redis expires entries natively, so this can't grow without bound the way the
+# old process-local dict did.
+_gist_cache: Final[RedisTTLCache] = RedisTTLCache(
+    namespace="gist", ttl_seconds=int(_DEFAULT_TTL_SECONDS)
+)
+
 
 @dataclass(slots=True)
 class _CachedResolver:
-    """Per-instance TTL cache + inflight dedup. Subclasses implement
-    `_do_fetch` and call `_get_cached` from their public `fetch`."""
+    """Redis TTL cache + in-flight dedup. Subclasses implement `_do_fetch`
+    and call `_get_cached` from their public `fetch`."""
 
     ttl_seconds: float = _DEFAULT_TTL_SECONDS
     timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS
-    _cache: dict[GistRef, tuple[float, list[GistFile] | None]] = field(
-        default_factory=dict, init=False, repr=False
-    )
-    _inflight: dict[GistRef, asyncio.Task[list[GistFile] | None]] = field(
-        default_factory=dict, init=False, repr=False
-    )
-    _lock: asyncio.Lock = field(
-        default_factory=asyncio.Lock, init=False, repr=False
-    )
 
     async def _get_cached(
         self,
@@ -210,23 +209,14 @@ class _CachedResolver:
             [], Coroutine[Any, Any, list[GistFile] | None]
         ],
     ) -> list[GistFile] | None:
-        now = time.monotonic()
-        async with self._lock:
-            cached = self._cache.get(ref)
-            if cached and now - cached[0] < self.ttl_seconds:
-                return cached[1]
-            task = self._inflight.get(ref)
-            is_originator = task is None
-            if is_originator:
-                task = asyncio.create_task(fetcher())
-                self._inflight[ref] = task
-        assert task is not None
-        files = await task
-        if is_originator:
-            async with self._lock:
-                self._inflight.pop(ref, None)
-                self._cache[ref] = (time.monotonic(), files)
-        return files
+        async def fetch_as_dicts() -> list[dict[str, str]] | None:
+            files = await fetcher()
+            return None if files is None else [asdict(f) for f in files]
+
+        cached = await _gist_cache.get_or_fetch(
+            f"{ref.user}/{ref.gist_id}", fetch_as_dicts
+        )
+        return None if cached is None else [GistFile(**d) for d in cached]
 
 
 # ---------------------------------------------------------------------------

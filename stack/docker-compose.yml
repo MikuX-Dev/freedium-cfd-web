@@ -59,6 +59,9 @@ services:
     command: ["uvicorn", "freedium_library.api.app:app", "--host", "0.0.0.0", "--port", "7080", "--workers", "2", "--log-level", "warning"]
     deploy:
       replicas: 2
+      resources:
+        limits:
+          memory: 900m
     environment:
       - ERROR_LOG_PATH=/var/log/freedium/errored-links.jsonl
       - PDF_INTERNAL_SECRET=${PDF_INTERNAL_SECRET:-dev-secret-change-me}
@@ -186,6 +189,10 @@ services:
       context: ..
       dockerfile: freedium-library/Dockerfile
     container_name: freedium-worker
+    deploy:
+      resources:
+        limits:
+          memory: 900m
     command:
       - python3
       - -m

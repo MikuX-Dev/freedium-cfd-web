@@ -29,7 +29,7 @@ curl-cffi = "^0.15.0"
 [tool.poetry.group.dev.dependencies]
 djlint = "^1.35.2"
 ruff = "^0.6.6"
-black = "^24.8.0"
+black = ">=24.8,<27.0"
 mypy = "^1.11.2"
 
 [tool.ruff]

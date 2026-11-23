@@ -23,7 +23,7 @@
 		"bits-ui": "^2.14.4",
 		"clsx": "^2.1.1",
 		"mode-watcher": "^1.1.0",
-		"postcss": "^8.5.4",
+		"postcss": "^8.5.33",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.4.0",
 		"svelte": "^5.46.1",

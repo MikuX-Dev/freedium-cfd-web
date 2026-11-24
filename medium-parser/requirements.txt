@@ -6,7 +6,7 @@ aiohttp==3.9.4
 aiohttp-retry==2.8.3
 tld==0.13
 bs4==0.0.1
-Jinja2==3.1.2
+Jinja2==3.1.6
 beautifulsoup4==4.12.2
 async-lru==2.0.4
 orjson==3.10.6
